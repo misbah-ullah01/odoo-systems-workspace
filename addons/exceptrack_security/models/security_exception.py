@@ -326,12 +326,11 @@ class SecurityException(models.Model):
             self.env.user.has_group('exceptrack_security.group_exceptrack_manager') or
             self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
         )
-        is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
 
         for record in self:
             # 1. Block regular users (Alice) from modifying any record once submitted (state != 'draft')
             if record.state != 'draft' and not is_reviewer_or_above:
-                # If only updating chatter (message_follower_ids, etc.), allow
+                # Allow chatter updates (tracking, activities, messages)
                 user_updated_fields = set(vals.keys()) - {'message_follower_ids', 'activity_ids', 'message_ids'}
                 if user_updated_fields:
                     raise UserError(_(
@@ -376,13 +375,11 @@ class SecurityException(models.Model):
         # Auto-assign Reviewer if not already assigned
         if not self.reviewer_id:
             reviewer_group = self.env.ref('exceptrack_security.group_exceptrack_reviewer', raise_if_not_found=False)
-            if reviewer_group and reviewer_group.users:
-                # Assign a reviewer who is NOT the requester if available
-                other_reviewers = reviewer_group.users.filtered(lambda u: u != self.env.user)
-                if other_reviewers:
-                    self.reviewer_id = other_reviewers[0]
-                else:
-                    self.reviewer_id = reviewer_group.users[0]
+            if reviewer_group:
+                reviewers = self.env['res.users'].search([('groups_id', 'in', [reviewer_group.id])])
+                if reviewers:
+                    other_reviewers = reviewers.filtered(lambda u: u != self.env.user)
+                    self.reviewer_id = other_reviewers[0] if other_reviewers else reviewers[0]
 
         self.write({'state': 'assessment'})
 
@@ -421,16 +418,15 @@ class SecurityException(models.Model):
             raise UserError(
                 _("Access Denied: Only a Security Reviewer or Administrator can recommend approval.")
             )
-        
+
         # Auto-assign Approving Manager if not set
         if not self.approver_id:
             manager_group = self.env.ref('exceptrack_security.group_exceptrack_manager', raise_if_not_found=False)
-            if manager_group and manager_group.users:
-                other_managers = manager_group.users.filtered(lambda u: u != self.env.user and u != self.requester_id)
-                if other_managers:
-                    self.approver_id = other_managers[0]
-                else:
-                    self.approver_id = manager_group.users[0]
+            if manager_group:
+                managers = self.env['res.users'].search([('groups_id', 'in', [manager_group.id])])
+                if managers:
+                    other_managers = managers.filtered(lambda u: u != self.env.user and u != self.requester_id)
+                    self.approver_id = other_managers[0] if other_managers else managers[0]
 
         if not self.approver_id:
             raise UserError(
