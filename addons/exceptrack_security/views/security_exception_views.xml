@@ -2,7 +2,62 @@
 <odoo>
 
     <!-- ================================================================== -->
-    <!-- FORM VIEW                                                           -->
+    <!-- KANBAN VIEW (Odoo 19 Visual Pipeline Board)                        -->
+    <!-- ================================================================== -->
+    <record id="view_security_exception_kanban" model="ir.ui.view">
+        <field name="name">security.exception.kanban</field>
+        <field name="model">security.exception</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state" class="o_kanban_small_column" sample="1">
+                <field name="id"/>
+                <field name="reference"/>
+                <field name="name"/>
+                <field name="owner_id"/>
+                <field name="risk_level"/>
+                <field name="state"/>
+                <field name="expiration_date"/>
+                <field name="days_until_expiry"/>
+                <field name="is_expired"/>
+                <field name="color"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_card oe_kanban_global_click p-2">
+                            <!-- Card Header: Reference & Risk Badge -->
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold text-muted" t-out="record.reference.value"/>
+                                <span t-if="record.risk_level.raw_value == 'critical'" class="badge bg-danger">Critical</span>
+                                <span t-if="record.risk_level.raw_value == 'high'" class="badge bg-warning text-dark">High</span>
+                                <span t-if="record.risk_level.raw_value == 'medium'" class="badge bg-info text-dark">Medium</span>
+                                <span t-if="record.risk_level.raw_value == 'low'" class="badge bg-success">Low</span>
+                            </div>
+
+                            <!-- Card Title -->
+                            <div class="fw-bold fs-6 text-truncate mb-2" t-out="record.name.value"/>
+
+                            <!-- Expired Warning Tag -->
+                            <div t-if="record.is_expired.raw_value" class="badge bg-danger text-white mb-2">
+                                ⚠ EXPIRED
+                            </div>
+                            <div t-elif="record.days_until_expiry.raw_value &gt; 0 and record.days_until_expiry.raw_value &lt;= 14" class="badge bg-warning text-dark mb-2">
+                                ⏳ Expires in <t t-out="record.days_until_expiry.value"/> days
+                            </div>
+
+                            <!-- Card Footer: Owner Avatar & Expiration -->
+                            <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+                                <small class="text-muted">
+                                    📅 Exp: <field name="expiration_date"/>
+                                </small>
+                                <field name="owner_id" widget="many2one_avatar_user"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- ================================================================== -->
+    <!-- FORM VIEW (Redesigned for Intuitive 2-Column Inputs)               -->
     <!-- ================================================================== -->
     <record id="view_security_exception_form" model="ir.ui.view">
         <field name="name">security.exception.form</field>
@@ -10,39 +65,39 @@
         <field name="arch" type="xml">
             <form string="Security Exception">
                 <header>
-                    <!-- Workflow Buttons -->
+                    <!-- Clear Intuitive Workflow Buttons with Action Icons -->
                     <button name="action_submit"
-                            string="Submit"
+                            string="▶ Submit for Assessment"
                             type="object"
                             class="oe_highlight"
                             invisible="state != 'draft'"/>
                     <button name="action_assess"
-                            string="Complete Assessment"
+                            string="🔍 Complete Review Assignment"
                             type="object"
                             class="oe_highlight"
                             invisible="state != 'assessment'"/>
                     <button name="action_recommend_approval"
-                            string="Recommend Approval"
+                            string="📋 Recommend Approval"
                             type="object"
                             class="oe_highlight"
                             invisible="state != 'review'"/>
                     <button name="action_reject"
-                            string="Reject"
+                            string="❌ Reject Request"
                             type="object"
                             class="btn-secondary"
                             invisible="state not in ('review', 'pending_approval')"/>
                     <button name="action_approve"
-                            string="Approve"
+                            string="👍 Approve Exception"
                             type="object"
                             class="oe_highlight"
                             invisible="state != 'pending_approval'"/>
                     <button name="action_initiate_review"
-                            string="Initiate Review"
+                            string="🔄 Initiate Periodic Review"
                             type="object"
                             class="oe_highlight"
                             invisible="state != 'active'"/>
                     <button name="action_renew"
-                            string="Renew"
+                            string="Extend Renewal"
                             type="object"
                             class="oe_highlight"
                             invisible="state != 'under_review'"/>
@@ -52,17 +107,17 @@
                             class="btn-secondary"
                             invisible="state != 'under_review'"/>
                     <button name="action_verify_pass"
-                            string="Verify — Pass"
+                            string="✅ Verify &amp; Pass (Close)"
                             type="object"
                             class="oe_highlight"
                             invisible="state != 'pending_verification'"/>
                     <button name="action_verify_fail"
-                            string="Verify — Fail"
+                            string="❌ Verify &amp; Fail"
                             type="object"
                             class="btn-danger"
                             invisible="state != 'pending_verification'"/>
                     <button name="action_revise"
-                            string="Revise"
+                            string="✏ Revise Draft"
                             type="object"
                             class="btn-secondary"
                             invisible="state != 'rejected'"/>
@@ -74,112 +129,100 @@
                 </header>
 
                 <sheet>
-                    <!-- Alert Banners -->
-                    <div class="alert alert-warning" role="alert"
-                         invisible="not is_expired">
-                        <strong>⚠ This exception has expired!</strong>
-                        Please initiate a review to renew or close this exception.
+                    <!-- Expired Banner -->
+                    <div class="alert alert-danger mb-3" role="alert" invisible="not is_expired">
+                        <strong>⚠ THIS EXCEPTION IS EXPIRED!</strong>
+                        Please initiate a review to extend renewal or perform remediation verification.
                     </div>
 
-                    <div class="oe_title">
+                    <!-- Top Title & Reference -->
+                    <div class="oe_title mb-3">
+                        <label for="name" string="Exception Title"/>
                         <h1>
-                            <field name="reference" readonly="1"/>
-                        </h1>
-                        <h2>
-                            <field name="name" placeholder="Exception Title..."
+                            <field name="name" placeholder="e.g. Legacy TLS 1.0 Server Exception..."
                                    readonly="state in ('closed', 'rejected')"/>
-                        </h2>
+                        </h1>
+                        <h3>
+                            <span class="text-muted">ID: </span>
+                            <field name="reference" readonly="1"/>
+                        </h3>
                     </div>
 
+                    <!-- Main Section: 2 Clear Columns (Primary Information) -->
                     <group>
-                        <group string="Ownership">
+                        <!-- Column 1: Request & Justification -->
+                        <group string="1. Request &amp; Business Justification">
                             <field name="requester_id"/>
                             <field name="owner_id"/>
+                            <field name="business_justification"
+                                   placeholder="Explain why this exception is required (e.g. Vendor delay, critical service dependence)..."/>
+                            <field name="technical_justification"
+                                   placeholder="Technical constraints preventing immediate patching..."/>
+                        </group>
+
+                        <!-- Column 2: Risk Ranking & Timeline -->
+                        <group string="2. Risk Ranking &amp; Target Timeline">
+                            <field name="risk_level" widget="radio" options="{'horizontal': true}"/>
+                            <field name="likelihood"/>
+                            <separator string="Workflow Assignees"/>
                             <field name="reviewer_id"/>
                             <field name="approver_id"/>
-                        </group>
-                        <group string="Risk Assessment">
-                            <field name="risk_level"
-                                   widget="radio"
-                                   options="{'horizontal': true}"/>
-                            <field name="likelihood"/>
-                            <field name="days_until_expiry"/>
-                            <field name="is_expired" invisible="1"/>
-                            <field name="renewal_count"
-                                   invisible="renewal_count == 0"/>
-                        </group>
-                    </group>
-
-                    <group>
-                        <group string="Dates">
+                            <separator string="Lifecycle Deadlines"/>
                             <field name="start_date"/>
                             <field name="review_date"/>
                             <field name="expiration_date"/>
+                            <field name="days_until_expiry" readonly="1"/>
+                            <field name="is_expired" invisible="1"/>
+                            <field name="renewal_count" invisible="renewal_count == 0"/>
                         </group>
                     </group>
 
+                    <!-- Notebook Tabs for Detailed Information -->
                     <notebook>
-                        <!-- Description Tab -->
-                        <page string="Description" name="description">
-                            <field name="description"
-                                   placeholder="Describe the security exception in detail..."/>
-                        </page>
-
-                        <!-- Risk Details Tab -->
-                        <page string="Risk Details" name="risk_details">
+                        <!-- Tab 1: Detailed Summary & Impact -->
+                        <page string="Detailed Summary &amp; Impact" name="details">
                             <group>
-                                <field name="impact" placeholder="Describe the potential impact..."/>
+                                <field name="description" placeholder="Describe the full system architecture and vulnerability details..."/>
                             </group>
-                            <group>
-                                <field name="risk_description" placeholder="Describe the risk in detail..."/>
+                            <group string="Impact Assessment">
+                                <field name="impact" placeholder="What is the potential impact if this risk is exploited?"/>
+                                <field name="risk_description" placeholder="CVSS scores, CVE IDs, or technical vectors..."/>
                             </group>
                         </page>
 
-                        <!-- Justification Tab -->
-                        <page string="Justification" name="justification">
-                            <group>
-                                <field name="business_justification"
-                                       placeholder="Why is this exception necessary from a business perspective?"/>
-                            </group>
-                            <group>
-                                <field name="technical_justification"
-                                       placeholder="What are the technical reasons for this exception?"/>
-                            </group>
-                        </page>
-
-                        <!-- Compensating Controls Tab -->
-                        <page string="Compensating Controls" name="controls">
+                        <!-- Tab 2: Compensating Risk Controls -->
+                        <page string="Compensating Risk Controls" name="controls">
                             <field name="control_ids">
                                 <list editable="bottom">
                                     <field name="sequence" widget="handle"/>
-                                    <field name="name"/>
+                                    <field name="name" string="Control Name"/>
                                     <field name="control_type"/>
-                                    <field name="status"/>
+                                    <field name="status" widget="badge"/>
                                     <field name="responsible_id"/>
                                     <field name="implementation_date"/>
                                 </list>
                             </field>
                         </page>
 
-                        <!-- Verification Tab -->
-                        <page string="Verification" name="verification"
+                        <!-- Tab 3: Verification & Audit -->
+                        <page string="Remediation Verification" name="verification"
                               invisible="state not in ('pending_verification', 'closed')">
                             <group>
-                                <group>
+                                <group string="Verification Outcome">
                                     <field name="verification_result"/>
                                     <field name="verified_by_id"/>
                                     <field name="verification_date"/>
                                 </group>
-                                <group>
+                                <group string="Audit Findings">
                                     <field name="verification_notes"
-                                           placeholder="Describe verification findings..."/>
+                                           placeholder="Record vulnerability scan results or physical audit findings..."/>
                                 </group>
                             </group>
                         </page>
                     </notebook>
                 </sheet>
 
-                <!-- Chatter -->
+                <!-- Chatter Audit Log -->
                 <div class="oe_chatter">
                     <field name="message_follower_ids"/>
                     <field name="activity_ids"/>
@@ -203,14 +246,8 @@
                 <field name="reference"/>
                 <field name="name"/>
                 <field name="owner_id"/>
-                <field name="risk_level"/>
-                <field name="state"
-                       widget="badge"
-                       decoration-info="state in ('draft', 'assessment')"
-                       decoration-warning="state in ('review', 'pending_approval', 'under_review')"
-                       decoration-success="state == 'active'"
-                       decoration-danger="state in ('rejected', 'pending_verification')"
-                       decoration-muted="state == 'closed'"/>
+                <field name="risk_level" widget="badge"/>
+                <field name="state" widget="badge"/>
                 <field name="review_date"/>
                 <field name="expiration_date"/>
                 <field name="days_until_expiry"/>
@@ -220,7 +257,7 @@
     </record>
 
     <!-- ================================================================== -->
-    <!-- SEARCH VIEW (Fully RNG Validated Schema)                            -->
+    <!-- SEARCH VIEW                                                         -->
     <!-- ================================================================== -->
     <record id="view_security_exception_search" model="ir.ui.view">
         <field name="name">security.exception.search</field>
@@ -254,13 +291,13 @@
                 <!-- Group By -->
                 <group>
                     <filter name="groupby_state"
-                            string="Status"
+                            string="Status Stage"
                             context="{'group_by': 'state'}"/>
                     <filter name="groupby_risk_level"
-                            string="Risk Level"
+                            string="Risk Severity"
                             context="{'group_by': 'risk_level'}"/>
                     <filter name="groupby_owner"
-                            string="Owner"
+                            string="Risk Owner"
                             context="{'group_by': 'owner_id'}"/>
                 </group>
             </search>
@@ -268,14 +305,14 @@
     </record>
 
     <!-- ================================================================== -->
-    <!-- WINDOW ACTIONS                                                      -->
+    <!-- WINDOW ACTIONS (Default view mode is KANBAN for easy visual UI)    -->
     <!-- ================================================================== -->
 
     <!-- All Exceptions -->
     <record id="action_security_exception" model="ir.actions.act_window">
         <field name="name">Security Exceptions</field>
         <field name="res_model">security.exception</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">kanban,list,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Create your first security exception
@@ -292,7 +329,7 @@
     <record id="action_security_exception_my" model="ir.actions.act_window">
         <field name="name">My Exceptions</field>
         <field name="res_model">security.exception</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">kanban,list,form</field>
         <field name="context">{'search_default_filter_my_exceptions': 1}</field>
     </record>
 
@@ -300,7 +337,7 @@
     <record id="action_security_exception_to_review" model="ir.actions.act_window">
         <field name="name">To Review</field>
         <field name="res_model">security.exception</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">kanban,list,form</field>
     </record>
 
 </odoo>

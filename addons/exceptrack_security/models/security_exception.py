@@ -27,10 +27,10 @@ class SecurityException(models.Model):
     ]
 
     RISK_LEVELS = [
-        ('low', 'Low'),
-        ('medium', 'Medium'),
-        ('high', 'High'),
-        ('critical', 'Critical'),
+        ('low', 'Low Risk'),
+        ('medium', 'Medium Risk'),
+        ('high', 'High Risk'),
+        ('critical', 'Critical Risk'),
     ]
 
     LIKELIHOOD_LEVELS = [
@@ -45,70 +45,100 @@ class SecurityException(models.Model):
     ]
 
     # -------------------------------------------------------------------------
+    # HELPER DEFAULTS
+    # -------------------------------------------------------------------------
+    def _default_start_date(self):
+        return date.today()
+
+    def _default_review_date(self):
+        return date.today() + timedelta(days=30)
+
+    def _default_expiration_date(self):
+        return date.today() + timedelta(days=90)
+
+    # -------------------------------------------------------------------------
     # FIELDS — Identification
     # -------------------------------------------------------------------------
     reference = fields.Char(
-        string='Reference',
+        string='Reference ID',
         readonly=True,
         copy=False,
         default=lambda self: _('New'),
         tracking=True,
+        help="Unique reference number generated automatically (e.g. SEC-EXC/00001).",
     )
     name = fields.Char(
-        string='Title',
+        string='Exception Title',
         required=True,
         tracking=True,
+        help="Brief title describing the security exception (e.g. Legacy TLS 1.0 Server).",
     )
     description = fields.Html(
-        string='Description',
+        string='Detailed Summary',
+        help="Provide a full description of the system, vulnerability, or issue requiring an exception.",
+    )
+    color = fields.Integer(
+        string='Color Index',
+        compute='_compute_color',
+        store=True,
     )
 
     # -------------------------------------------------------------------------
-    # FIELDS — Ownership
+    # FIELDS — Ownership & Assignments
     # -------------------------------------------------------------------------
     requester_id = fields.Many2one(
         'res.users',
-        string='Requester',
+        string='Requested By',
         default=lambda self: self.env.user,
         required=True,
         tracking=True,
+        help="The person submitting this exception request.",
     )
     owner_id = fields.Many2one(
         'res.users',
-        string='Owner',
+        string='Risk Owner',
+        default=lambda self: self.env.user,
+        required=True,
         tracking=True,
+        help="The person accountable for managing this risk and implementing controls.",
     )
     reviewer_id = fields.Many2one(
         'res.users',
-        string='Reviewer',
+        string='Security Reviewer',
         tracking=True,
+        help="The security engineer assigned to evaluate this request.",
     )
     approver_id = fields.Many2one(
         'res.users',
-        string='Approver',
+        string='Approving Manager',
         tracking=True,
+        help="The manager authorized to officially approve or reject this exception.",
     )
 
     # -------------------------------------------------------------------------
-    # FIELDS — Risk
+    # FIELDS — Risk Ranking
     # -------------------------------------------------------------------------
     risk_level = fields.Selection(
         selection=RISK_LEVELS,
-        string='Risk Level',
+        string='Risk Severity',
         default='medium',
         required=True,
         tracking=True,
+        help="Rank the severity of this risk: Low, Medium, High, or Critical.",
     )
     impact = fields.Text(
-        string='Impact',
+        string='Business Impact',
+        help="What happens if this vulnerability or exception is exploited?",
     )
     likelihood = fields.Selection(
         selection=LIKELIHOOD_LEVELS,
-        string='Likelihood',
+        string='Exploit Likelihood',
         default='medium',
+        help="How likely is an exploit to occur? (Low, Medium, High).",
     )
     risk_description = fields.Text(
-        string='Risk Description',
+        string='Risk Details',
+        help="Technical notes on CVSS scores, vulnerability vectors, or CVE IDs.",
     )
 
     # -------------------------------------------------------------------------
@@ -116,33 +146,44 @@ class SecurityException(models.Model):
     # -------------------------------------------------------------------------
     business_justification = fields.Text(
         string='Business Justification',
+        help="Why is this exception necessary? (e.g. Vendor delay, critical business continuity).",
     )
     technical_justification = fields.Text(
         string='Technical Justification',
+        help="What technical constraints prevent immediate remediation?",
     )
 
     # -------------------------------------------------------------------------
-    # FIELDS — Dates
+    # FIELDS — Dates & Deadlines
     # -------------------------------------------------------------------------
     start_date = fields.Date(
-        string='Start Date',
+        string='Effective Start Date',
+        default=_default_start_date,
+        required=True,
         tracking=True,
+        help="Date when this security exception becomes effective.",
     )
     review_date = fields.Date(
-        string='Review Date',
+        string='Scheduled Review Date',
+        default=_default_review_date,
+        required=True,
         tracking=True,
+        help="Date when the security team must conduct a periodic review.",
     )
     expiration_date = fields.Date(
-        string='Expiration Date',
+        string='Expiration Deadline',
+        default=_default_expiration_date,
+        required=True,
         tracking=True,
+        help="Final date when this exception expires and must be closed or renewed.",
     )
 
     # -------------------------------------------------------------------------
-    # FIELDS — Lifecycle
+    # FIELDS — Lifecycle State
     # -------------------------------------------------------------------------
     state = fields.Selection(
         selection=STATES,
-        string='Status',
+        string='Lifecycle Stage',
         default='draft',
         required=True,
         tracking=True,
@@ -150,20 +191,17 @@ class SecurityException(models.Model):
     )
 
     # -------------------------------------------------------------------------
-    # FIELDS — Compensating Controls
+    # FIELDS — Compensating Controls & Verification
     # -------------------------------------------------------------------------
     control_ids = fields.One2many(
         'security.exception.control',
         'exception_id',
         string='Compensating Controls',
+        help="Temporary security controls put in place to mitigate the risk.",
     )
-
-    # -------------------------------------------------------------------------
-    # FIELDS — Verification
-    # -------------------------------------------------------------------------
     verification_result = fields.Selection(
         selection=VERIFICATION_RESULTS,
-        string='Verification Result',
+        string='Verification Outcome',
         tracking=True,
     )
     verified_by_id = fields.Many2one(
@@ -176,24 +214,25 @@ class SecurityException(models.Model):
         tracking=True,
     )
     verification_notes = fields.Text(
-        string='Verification Notes',
+        string='Verification Findings',
+        help="Detailed notes confirming remediation has been verified.",
     )
 
     # -------------------------------------------------------------------------
-    # FIELDS — Computed
+    # FIELDS — Computed Indicators
     # -------------------------------------------------------------------------
     days_until_expiry = fields.Integer(
-        string='Days Until Expiry',
+        string='Days Remaining',
         compute='_compute_days_until_expiry',
         store=True,
     )
     is_expired = fields.Boolean(
-        string='Is Expired',
+        string='Expired Indicator',
         compute='_compute_is_expired',
         store=True,
     )
     renewal_count = fields.Integer(
-        string='Renewal Count',
+        string='Renewals',
         default=0,
         copy=False,
     )
@@ -205,6 +244,18 @@ class SecurityException(models.Model):
     # -------------------------------------------------------------------------
     # COMPUTED METHODS
     # -------------------------------------------------------------------------
+    @api.depends('risk_level', 'state')
+    def _compute_color(self):
+        for record in self:
+            if record.risk_level == 'critical':
+                record.color = 1  # Red
+            elif record.risk_level == 'high':
+                record.color = 2  # Orange
+            elif record.risk_level == 'medium':
+                record.color = 3  # Yellow
+            else:
+                record.color = 4  # Green
+
     @api.depends('expiration_date')
     def _compute_days_until_expiry(self):
         today = date.today()
@@ -241,7 +292,7 @@ class SecurityException(models.Model):
             if record.start_date and record.expiration_date:
                 if record.expiration_date < record.start_date:
                     raise ValidationError(
-                        _("Expiration date cannot be before the start date.")
+                        _("Expiration Deadline cannot be earlier than the Effective Start Date.")
                     )
 
     @api.constrains('review_date', 'expiration_date')
@@ -250,7 +301,7 @@ class SecurityException(models.Model):
             if record.review_date and record.expiration_date:
                 if record.review_date > record.expiration_date:
                     raise ValidationError(
-                        _("Review date cannot be after the expiration date.")
+                        _("Scheduled Review Date cannot be after the Expiration Deadline.")
                     )
 
     # -------------------------------------------------------------------------
@@ -266,14 +317,14 @@ class SecurityException(models.Model):
         return super().create(vals_list)
 
     # -------------------------------------------------------------------------
-    # WORKFLOW ACTIONS
+    # WORKFLOW ACTIONS (Clear user feedback)
     # -------------------------------------------------------------------------
     def action_submit(self):
         """Draft → Assessment"""
         self.ensure_one()
         if not self.business_justification:
             raise UserError(
-                _("Business justification is required before submitting.")
+                _("Please enter a Business Justification before submitting for assessment.")
             )
         self.write({'state': 'assessment'})
 
@@ -282,11 +333,7 @@ class SecurityException(models.Model):
         self.ensure_one()
         if not self.reviewer_id:
             raise UserError(
-                _("A reviewer must be assigned before moving to review.")
-            )
-        if not self.risk_level:
-            raise UserError(
-                _("Risk level must be set before assessment is complete.")
+                _("Please assign a Security Reviewer before completing assessment.")
             )
         self.write({'state': 'review'})
 
@@ -295,20 +342,16 @@ class SecurityException(models.Model):
         self.ensure_one()
         if not self.approver_id:
             raise UserError(
-                _("An approver must be assigned before recommending approval.")
+                _("Please assign an Approving Manager before recommending approval.")
             )
         self.write({'state': 'pending_approval'})
 
     def action_approve(self):
         """Pending Approval → Active"""
         self.ensure_one()
-        if not self.start_date:
+        if not self.start_date or not self.expiration_date:
             raise UserError(
-                _("Start date is required before activation.")
-            )
-        if not self.expiration_date:
-            raise UserError(
-                _("Expiration date is required before activation.")
+                _("Both Start Date and Expiration Deadline are required before activation.")
             )
         self.write({'state': 'active'})
 
@@ -317,12 +360,12 @@ class SecurityException(models.Model):
         self.ensure_one()
         if self.state not in ('review', 'pending_approval'):
             raise UserError(
-                _("Rejection is only possible during Review or Pending Approval.")
+                _("Rejection is only allowed during Review or Pending Approval stages.")
             )
         self.write({'state': 'rejected'})
 
     def action_revise(self):
-        """Rejected → Draft (allow revision)"""
+        """Rejected → Draft"""
         self.ensure_one()
         if self.state != 'rejected':
             raise UserError(
@@ -336,7 +379,7 @@ class SecurityException(models.Model):
         self.write({'state': 'under_review'})
 
     def action_renew(self):
-        """Under Review → Renewed → Active"""
+        """Under Review → Active (Renewal)"""
         self.ensure_one()
         if self.state != 'under_review':
             raise UserError(
@@ -347,7 +390,7 @@ class SecurityException(models.Model):
             'renewal_count': self.renewal_count + 1,
         })
         self.message_post(
-            body=_("Exception renewed (renewal #%d).") % self.renewal_count,
+            body=_("🔄 Exception renewed (Renewal #%d).") % self.renewal_count,
             message_type='comment',
             subtype_xmlid='mail.mt_note',
         )
@@ -368,15 +411,15 @@ class SecurityException(models.Model):
         })
 
     def action_verify_pass(self):
-        """Pending Verification → Closed (pass)"""
+        """Pending Verification → Closed (Pass)"""
         self.ensure_one()
         if self.state != 'pending_verification':
             raise UserError(
-                _("Verification is only possible for exceptions pending verification.")
+                _("Verification is only possible when pending verification.")
             )
         if not self.verification_notes:
             raise UserError(
-                _("Verification notes are required before closing.")
+                _("Please record your Verification Findings in the Verification tab before closing.")
             )
         self.write({
             'state': 'closed',
@@ -386,15 +429,15 @@ class SecurityException(models.Model):
         })
 
     def action_verify_fail(self):
-        """Pending Verification → Active (fail)"""
+        """Pending Verification → Active (Fail)"""
         self.ensure_one()
         if self.state != 'pending_verification':
             raise UserError(
-                _("Verification is only possible for exceptions pending verification.")
+                _("Verification is only possible when pending verification.")
             )
         if not self.verification_notes:
             raise UserError(
-                _("Verification notes are required.")
+                _("Please record your Verification Findings in the Verification tab.")
             )
         self.write({
             'state': 'active',
@@ -427,10 +470,10 @@ class SecurityException(models.Model):
                 record.activity_schedule(
                     'mail.mail_activity_data_warning',
                     date_deadline=record.expiration_date,
-                    summary=_("Exception Expiring Soon"),
+                    summary=_("Security Exception Expiring Soon"),
                     note=_(
-                        "Security exception '%s' expires on %s. "
-                        "Please review and take action."
-                    ) % (record.name, record.expiration_date),
+                        "Security exception '%s' (%s) expires on %s. "
+                        "Please initiate review and remediation verification."
+                    ) % (record.name, record.reference, record.expiration_date),
                     user_id=(record.owner_id or record.requester_id).id,
                 )
