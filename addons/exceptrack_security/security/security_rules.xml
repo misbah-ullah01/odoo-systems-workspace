@@ -18,10 +18,10 @@
         <field name="perm_read" eval="True"/>
         <field name="perm_write" eval="True"/>
         <field name="perm_create" eval="True"/>
-        <field name="perm_unlink" eval="False"/>
+        <field name="perm_unlink" eval="True"/>
     </record>
 
-    <!-- Reviewers can also see exceptions assigned to them for review -->
+    <!-- Reviewers can see exceptions where they are requester, owner, or assigned reviewer -->
     <record id="rule_exception_reviewer" model="ir.rule">
         <field name="name">ExcepTrack: Reviewer — Assigned Exceptions</field>
         <field name="model_id" ref="model_security_exception"/>
@@ -35,14 +35,20 @@
         <field name="perm_read" eval="True"/>
         <field name="perm_write" eval="True"/>
         <field name="perm_create" eval="True"/>
-        <field name="perm_unlink" eval="False"/>
+        <field name="perm_unlink" eval="True"/>
     </record>
 
-    <!-- Managers see all exceptions -->
+    <!-- Managers can only see exceptions assigned to them or created/owned by them -->
     <record id="rule_exception_manager" model="ir.rule">
-        <field name="name">ExcepTrack: Manager — All Exceptions</field>
+        <field name="name">ExcepTrack: Manager — Assigned Approvals &amp; Exceptions</field>
         <field name="model_id" ref="model_security_exception"/>
-        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="domain_force">[
+            '|', '|', '|',
+            ('requester_id', '=', user.id),
+            ('owner_id', '=', user.id),
+            ('reviewer_id', '=', user.id),
+            ('approver_id', '=', user.id)
+        ]</field>
         <field name="groups" eval="[(4, ref('group_exceptrack_manager'))]"/>
         <field name="perm_read" eval="True"/>
         <field name="perm_write" eval="True"/>
@@ -50,7 +56,7 @@
         <field name="perm_unlink" eval="True"/>
     </record>
 
-    <!-- Admins see all exceptions -->
+    <!-- Admins see all exceptions globally across the company -->
     <record id="rule_exception_admin" model="ir.rule">
         <field name="name">ExcepTrack: Admin — All Exceptions</field>
         <field name="model_id" ref="model_security_exception"/>
@@ -80,10 +86,10 @@
         <field name="perm_read" eval="True"/>
         <field name="perm_write" eval="True"/>
         <field name="perm_create" eval="True"/>
-        <field name="perm_unlink" eval="False"/>
+        <field name="perm_unlink" eval="True"/>
     </record>
 
-    <!-- Reviewers: controls visible if the parent exception is visible -->
+    <!-- Reviewers: controls visible if assigned to parent exception -->
     <record id="rule_control_reviewer" model="ir.rule">
         <field name="name">ExcepTrack: Reviewer — Assigned Controls</field>
         <field name="model_id" ref="model_security_exception_control"/>
@@ -97,14 +103,20 @@
         <field name="perm_read" eval="True"/>
         <field name="perm_write" eval="True"/>
         <field name="perm_create" eval="True"/>
-        <field name="perm_unlink" eval="False"/>
+        <field name="perm_unlink" eval="True"/>
     </record>
 
-    <!-- Managers: all controls -->
+    <!-- Managers: controls visible if assigned to parent exception -->
     <record id="rule_control_manager" model="ir.rule">
-        <field name="name">ExcepTrack: Manager — All Controls</field>
+        <field name="name">ExcepTrack: Manager — Assigned Controls</field>
         <field name="model_id" ref="model_security_exception_control"/>
-        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="domain_force">[
+            '|', '|', '|',
+            ('exception_id.requester_id', '=', user.id),
+            ('exception_id.owner_id', '=', user.id),
+            ('exception_id.reviewer_id', '=', user.id),
+            ('exception_id.approver_id', '=', user.id)
+        ]</field>
         <field name="groups" eval="[(4, ref('group_exceptrack_manager'))]"/>
         <field name="perm_read" eval="True"/>
         <field name="perm_write" eval="True"/>

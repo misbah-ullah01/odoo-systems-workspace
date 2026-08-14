@@ -379,12 +379,12 @@ class SecurityException(models.Model):
             # 3. Block unassigned Reviewers/Managers from modifying a ticket assigned to someone else
             if not is_admin and not self.env.context.get('sudo_workflow'):
                 if record.state in ('assessment', 'review', 'under_review', 'pending_verification') and record.reviewer_id:
-                    if self.env.user != record.reviewer_id and self.env.user != record.approver_id:
+                    if self.env.user.id != record.reviewer_id.id and (not record.approver_id or self.env.user.id != record.approver_id.id):
                         user_updated_fields = set(vals.keys()) - {'message_follower_ids', 'activity_ids', 'message_ids'}
                         if user_updated_fields:
                             raise UserError(_(
                                 "Access Denied: Security exception '%s' is assigned to Reviewer %s. "
-                                "Only the assigned Reviewer or Administrator can modify this ticket."
+                                "Only the assigned Reviewer or an Administrator can modify this ticket."
                             ) % (record.name, record.reviewer_id.name))
 
         return super().write(vals)
@@ -398,7 +398,7 @@ class SecurityException(models.Model):
                     "Audit Compliance Violation: Security exception '%s' (%s) has passed the Draft stage and cannot be deleted. "
                     "Submitted exceptions must remain in the system for security audit history."
                 ) % (record.name, record.reference))
-            if record.state == 'draft' and record.requester_id != self.env.user and not is_admin:
+            if record.state == 'draft' and record.requester_id.id != self.env.user.id and not is_admin:
                 raise UserError(_(
                     "Access Denied: You can only delete Draft requests that you submitted yourself."
                 ))
@@ -452,8 +452,8 @@ class SecurityException(models.Model):
                 _("Access Denied: Only a Security Reviewer or Administrator can complete security assessment.")
             )
         
-        # Enforce Assigned Reviewer Lockout (Reviewer B cannot assess Reviewer A's ticket)
-        if self.reviewer_id and self.env.user != self.reviewer_id and not is_admin:
+        # Enforce Assigned Reviewer Lockout
+        if self.reviewer_id and self.env.user.id != self.reviewer_id.id and not is_admin:
             raise UserError(_(
                 "Access Denied: Security exception '%s' is assigned to Reviewer %s. "
                 "Only the assigned Reviewer or a Security Administrator can complete this review."
@@ -476,7 +476,7 @@ class SecurityException(models.Model):
                 _("Access Denied: Only a Security Reviewer or Administrator can recommend approval.")
             )
 
-        if self.reviewer_id and self.env.user != self.reviewer_id and not is_admin:
+        if self.reviewer_id and self.env.user.id != self.reviewer_id.id and not is_admin:
             raise UserError(_(
                 "Access Denied: Security exception '%s' is assigned to Reviewer %s. "
                 "Only the assigned Reviewer or a Security Administrator can recommend approval."
@@ -484,7 +484,6 @@ class SecurityException(models.Model):
 
         managers = self._get_group_users('exceptrack_security.group_exceptrack_manager')
 
-        # Auto-assign Manager using Modulo Round-Robin if not manually selected
         assigned_approver = False
         if not self.approver_id and managers:
             candidate_managers = managers.filtered(lambda u: u != self.env.user and u != self.requester_id) or managers
@@ -528,14 +527,14 @@ class SecurityException(models.Model):
             )
 
         # 2. Assigned Manager Lockout Check (Manager B cannot approve Manager A's ticket)
-        if self.approver_id and self.env.user != self.approver_id and not is_admin:
+        if self.approver_id and self.env.user.id != self.approver_id.id and not is_admin:
             raise UserError(_(
                 "Access Denied: Security exception '%s' is assigned to Approving Manager %s. "
-                "Only the assigned Manager or a Security Administrator can approve this request."
-            ) % (self.name, self.approver_id.name))
+                "Only the assigned Manager (%s) or a Security Administrator can approve this request."
+            ) % (self.name, self.approver_id.name, self.approver_id.name))
 
         # 3. Separation of Duties Check: Submitter cannot self-approve unless Admin
-        if self.requester_id == self.env.user and not is_admin:
+        if self.requester_id.id == self.env.user.id and not is_admin:
             raise UserError(
                 _("Separation of Duties Violation: You submitted this exception request yourself. An independent Manager must review and approve it.")
             )
@@ -558,12 +557,12 @@ class SecurityException(models.Model):
                 _("Access Denied: Only a Security Reviewer, Manager, or Administrator can reject requests.")
             )
         
-        if self.state == 'pending_approval' and self.approver_id and self.env.user != self.approver_id and not is_admin:
+        if self.state == 'pending_approval' and self.approver_id and self.env.user.id != self.approver_id.id and not is_admin:
             raise UserError(_(
                 "Access Denied: Security exception '%s' is assigned to Approving Manager %s. Only the assigned Manager can reject this request."
             ) % (self.name, self.approver_id.name))
 
-        if self.state in ('assessment', 'review') and self.reviewer_id and self.env.user != self.reviewer_id and not is_admin:
+        if self.state in ('assessment', 'review') and self.reviewer_id and self.env.user.id != self.reviewer_id.id and not is_admin:
             raise UserError(_(
                 "Access Denied: Security exception '%s' is assigned to Reviewer %s. Only the assigned Reviewer can reject this request."
             ) % (self.name, self.reviewer_id.name))
@@ -604,7 +603,7 @@ class SecurityException(models.Model):
             raise UserError(
                 _("Access Denied: Only an Approving Manager or Administrator can grant exception renewals.")
             )
-        if self.approver_id and self.env.user != self.approver_id and not is_admin:
+        if self.approver_id and self.env.user.id != self.approver_id.id and not is_admin:
             raise UserError(_(
                 "Access Denied: Security exception '%s' is assigned to Manager %s. Only the assigned Manager can grant renewals."
             ) % (self.name, self.approver_id.name))
@@ -653,11 +652,11 @@ class SecurityException(models.Model):
             raise UserError(
                 _("Access Denied: Only a Security Reviewer or Administrator can perform remediation verification.")
             )
-        if self.reviewer_id and self.env.user != self.reviewer_id and not is_admin:
+        if self.reviewer_id and self.env.user.id != self.reviewer_id.id and not is_admin:
             raise UserError(_(
                 "Access Denied: Security exception '%s' is assigned to Reviewer %s. Only the assigned Reviewer can verify remediation."
             ) % (self.name, self.reviewer_id.name))
-        if self.requester_id == self.env.user and not is_admin:
+        if self.requester_id.id == self.env.user.id and not is_admin:
             raise UserError(
                 _("Separation of Duties Violation: You cannot verify the remediation of an exception that you requested yourself!")
             )
@@ -685,7 +684,7 @@ class SecurityException(models.Model):
             raise UserError(
                 _("Access Denied: Only a Security Reviewer or Administrator can perform remediation verification.")
             )
-        if self.reviewer_id and self.env.user != self.reviewer_id and not is_admin:
+        if self.reviewer_id and self.env.user.id != self.reviewer_id.id and not is_admin:
             raise UserError(_(
                 "Access Denied: Security exception '%s' is assigned to Reviewer %s. Only the assigned Reviewer can verify remediation."
             ) % (self.name, self.reviewer_id.name))
