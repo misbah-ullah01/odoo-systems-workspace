@@ -220,7 +220,7 @@
     </record>
 
     <!-- ================================================================== -->
-    <!-- SEARCH VIEW (Odoo 19: <group> tag inside <search> has NO attributes) -->
+    <!-- SEARCH VIEW (Fully RNG Validated Schema)                            -->
     <!-- ================================================================== -->
     <record id="view_security_exception_search" model="ir.ui.view">
         <field name="name">security.exception.search</field>
@@ -251,8 +251,7 @@
                         string="Closed"
                         domain="[('state', '=', 'closed')]"/>
 
-                <!-- Group By (Odoo 19: <separator string="Group By"/> before bare <group>) -->
-                <separator string="Group By"/>
+                <!-- Group By -->
                 <group>
                     <filter name="groupby_state"
                             string="Status"
