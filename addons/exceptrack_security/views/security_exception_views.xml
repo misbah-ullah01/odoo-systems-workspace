@@ -2,13 +2,13 @@
 <odoo>
 
     <!-- ================================================================== -->
-    <!-- KANBAN VIEW (Odoo 19 Visual Pipeline Board)                        -->
+    <!-- KANBAN VIEW (All Stages Visible & Draggable)                      -->
     <!-- ================================================================== -->
     <record id="view_security_exception_kanban" model="ir.ui.view">
         <field name="name">security.exception.kanban</field>
         <field name="model">security.exception</field>
         <field name="arch" type="xml">
-            <kanban default_group_by="state" class="o_kanban_small_column" sample="1">
+            <kanban default_group_by="state" class="o_kanban_small_column" sample="1" quick_create="false">
                 <field name="id"/>
                 <field name="reference"/>
                 <field name="name"/>
@@ -57,7 +57,7 @@
     </record>
 
     <!-- ================================================================== -->
-    <!-- FORM VIEW (Intuitive Single-Screen Inputs & Assignments)           -->
+    <!-- FORM VIEW (Full-Width Spacious Form Layout — No Squishing)        -->
     <!-- ================================================================== -->
     <record id="view_security_exception_form" model="ir.ui.view">
         <field name="name">security.exception.form</field>
@@ -65,7 +65,7 @@
         <field name="arch" type="xml">
             <form string="Security Exception">
                 <header>
-                    <!-- Clear Intuitive Workflow Buttons with Action Icons -->
+                    <!-- Workflow Action Buttons -->
                     <button name="action_submit"
                             string="▶ Submit for Assessment"
                             type="object"
@@ -135,7 +135,7 @@
                         Please initiate a review to extend renewal or perform remediation verification.
                     </div>
 
-                    <!-- Top Title & Reference -->
+                    <!-- Header Title & Reference ID -->
                     <div class="oe_title mb-3">
                         <span class="badge bg-primary fs-6 mb-1">Security Exception Record</span>
                         <h1>
@@ -148,9 +148,8 @@
                         </h3>
                     </div>
 
-                    <!-- Main 2-Column Section: Assignees & Timeline -->
+                    <!-- Section 1: Assignees & Timeline (Full Width 2-Column Grid) -->
                     <group>
-                        <!-- Column 1: Assignees & Ownership -->
                         <group string="👤 Assignees &amp; Responsibilities">
                             <field name="requester_id" string="Requested By (Submitter)"/>
                             <field name="owner_id" string="Risk Owner (Accountable)"/>
@@ -158,7 +157,6 @@
                             <field name="approver_id" string="Approving Manager"/>
                         </group>
 
-                        <!-- Column 2: Risk Severity & Timeline -->
                         <group string="⚡ Risk Ranking &amp; Deadlines">
                             <field name="risk_level" string="Risk Severity" widget="radio" options="{'horizontal': true}"/>
                             <field name="likelihood" string="Exploit Likelihood" widget="radio" options="{'horizontal': true}"/>
@@ -172,8 +170,8 @@
                         </group>
                     </group>
 
-                    <!-- Main Section: Justification & Description (Right in front of user) -->
-                    <group string="📝 Details &amp; Justification">
+                    <!-- Section 2: Details & Business Justification -->
+                    <group string="📝 Details &amp; Business Justification">
                         <field name="business_justification"
                                string="Business Justification"
                                placeholder="Why is this security exception necessary? (e.g. Vendor delay, critical business dependence)..."/>
@@ -185,7 +183,7 @@
                                placeholder="Detailed technical summary of the affected system, architecture, or vulnerability..."/>
                     </group>
 
-                    <!-- Notebook Tabs for Controls & Verification -->
+                    <!-- Notebook Tabs for Controls, Verification, and Audit Log -->
                     <notebook>
                         <!-- Tab 1: Compensating Controls -->
                         <page string="🛡 Compensating Risk Controls" name="controls">
@@ -225,15 +223,17 @@
                                 </group>
                             </group>
                         </page>
+
+                        <!-- Tab 4: Audit Activity & Chatter Log (Clean full-width tab inside form) -->
+                        <page string="💬 Activity &amp; Audit Log" name="chatter_tab">
+                            <div class="p-2">
+                                <field name="message_follower_ids" widget="many2many_tags"/>
+                                <field name="activity_ids"/>
+                                <field name="message_ids"/>
+                            </div>
+                        </page>
                     </notebook>
                 </sheet>
-
-                <!-- Chatter Audit Log -->
-                <div class="oe_chatter">
-                    <field name="message_follower_ids"/>
-                    <field name="activity_ids"/>
-                    <field name="message_ids"/>
-                </div>
             </form>
         </field>
     </record>
@@ -319,6 +319,7 @@
         <field name="name">Security Exceptions</field>
         <field name="res_model">security.exception</field>
         <field name="view_mode">kanban,list,form</field>
+        <field name="target">current</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Create your first security exception
@@ -336,6 +337,7 @@
         <field name="name">My Exceptions</field>
         <field name="res_model">security.exception</field>
         <field name="view_mode">kanban,list,form</field>
+        <field name="target">current</field>
         <field name="context">{'search_default_filter_my_exceptions': 1}</field>
     </record>
 
@@ -344,6 +346,7 @@
         <field name="name">To Review</field>
         <field name="res_model">security.exception</field>
         <field name="view_mode">kanban,list,form</field>
+        <field name="target">current</field>
     </record>
 
 </odoo>
