@@ -11,22 +11,22 @@
             <form string="Compensating Control">
                 <sheet>
                     <group>
-                        <group>
-                            <field name="name"/>
-                            <field name="control_type"/>
-                            <field name="status"/>
+                        <group string="Control Information">
+                            <field name="name" string="Control Name"/>
+                            <field name="control_type" string="Control Type"/>
+                            <field name="status" string="Status"/>
                         </group>
-                        <group>
-                            <field name="exception_id"/>
-                            <field name="responsible_id"/>
-                            <field name="implementation_date"/>
+                        <group string="Assignments &amp; Dates">
+                            <field name="exception_id" string="Security Exception"/>
+                            <field name="responsible_id" string="Responsible Person"/>
+                            <field name="implementation_date" string="Implementation Date"/>
                         </group>
                     </group>
-                    <group string="Details">
+                    <group string="Control Details &amp; Notes">
                         <field name="description"
-                               placeholder="Describe this compensating control..."/>
+                               placeholder="Describe this compensating control in detail..."/>
                         <field name="notes"
-                               placeholder="Additional notes..."/>
+                               placeholder="Additional operational notes..."/>
                     </group>
                 </sheet>
             </form>
@@ -34,24 +34,25 @@
     </record>
 
     <!-- ================================================================== -->
-    <!-- LIST VIEW — Compensating Control (Odoo 19: <list> replaces <tree>)  -->
+    <!-- LIST VIEW — Compensating Control                                   -->
     <!-- ================================================================== -->
     <record id="view_exception_control_list" model="ir.ui.view">
         <field name="name">security.exception.control.list</field>
         <field name="model">security.exception.control</field>
         <field name="arch" type="xml">
             <list string="Compensating Controls" editable="bottom">
-                <field name="sequence" widget="handle"/>
-                <field name="name"/>
-                <field name="control_type"/>
+                <field name="sequence" widget="handle" string=" "/>
+                <field name="name" string="Control Name"/>
+                <field name="control_type" string="Control Type"/>
                 <field name="status"
+                       string="Status"
                        widget="badge"
                        decoration-info="status == 'planned'"
                        decoration-warning="status == 'implemented'"
                        decoration-success="status == 'verified'"/>
-                <field name="responsible_id"/>
-                <field name="implementation_date"/>
-                <field name="exception_id"/>
+                <field name="responsible_id" string="Responsible Person"/>
+                <field name="implementation_date" string="Implementation Date"/>
+                <field name="exception_id" string="Security Exception"/>
             </list>
         </field>
     </record>

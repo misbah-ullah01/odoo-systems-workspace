@@ -25,10 +25,10 @@
                             <!-- Card Header: Reference & Risk Badge -->
                             <div class="d-flex justify-content-between align-items-center mb-1">
                                 <span class="fw-bold text-muted" t-out="record.reference.value"/>
-                                <span t-if="record.risk_level.raw_value == 'critical'" class="badge bg-danger">Critical</span>
-                                <span t-if="record.risk_level.raw_value == 'high'" class="badge bg-warning text-dark">High</span>
-                                <span t-if="record.risk_level.raw_value == 'medium'" class="badge bg-info text-dark">Medium</span>
-                                <span t-if="record.risk_level.raw_value == 'low'" class="badge bg-success">Low</span>
+                                <span t-if="record.risk_level.raw_value == 'critical'" class="badge bg-danger">Critical Risk</span>
+                                <span t-if="record.risk_level.raw_value == 'high'" class="badge bg-warning text-dark">High Risk</span>
+                                <span t-if="record.risk_level.raw_value == 'medium'" class="badge bg-info text-dark">Medium Risk</span>
+                                <span t-if="record.risk_level.raw_value == 'low'" class="badge bg-success">Low Risk</span>
                             </div>
 
                             <!-- Card Title -->
@@ -47,7 +47,7 @@
                                 <small class="text-muted">
                                     📅 Exp: <field name="expiration_date"/>
                                 </small>
-                                <field name="owner_id" widget="many2one_avatar_user"/>
+                                <field name="owner_id" widget="many2one_avatar_user" string="Owner"/>
                             </div>
                         </div>
                     </t>
@@ -57,7 +57,7 @@
     </record>
 
     <!-- ================================================================== -->
-    <!-- FORM VIEW (Redesigned for Intuitive 2-Column Inputs)               -->
+    <!-- FORM VIEW (Intuitive Single-Screen Inputs & Assignments)           -->
     <!-- ================================================================== -->
     <record id="view_security_exception_form" model="ir.ui.view">
         <field name="name">security.exception.form</field>
@@ -137,85 +137,91 @@
 
                     <!-- Top Title & Reference -->
                     <div class="oe_title mb-3">
-                        <label for="name" string="Exception Title"/>
+                        <span class="badge bg-primary fs-6 mb-1">Security Exception Record</span>
                         <h1>
-                            <field name="name" placeholder="e.g. Legacy TLS 1.0 Server Exception..."
+                            <field name="name" placeholder="Enter Exception Title (e.g. Legacy TLS 1.0 Authentication Server)..."
                                    readonly="state in ('closed', 'rejected')"/>
                         </h1>
                         <h3>
-                            <span class="text-muted">ID: </span>
+                            <span class="text-muted">Reference ID: </span>
                             <field name="reference" readonly="1"/>
                         </h3>
                     </div>
 
-                    <!-- Main Section: 2 Clear Columns (Primary Information) -->
+                    <!-- Main 2-Column Section: Assignees & Timeline -->
                     <group>
-                        <!-- Column 1: Request & Justification -->
-                        <group string="1. Request &amp; Business Justification">
-                            <field name="requester_id"/>
-                            <field name="owner_id"/>
-                            <field name="business_justification"
-                                   placeholder="Explain why this exception is required (e.g. Vendor delay, critical service dependence)..."/>
-                            <field name="technical_justification"
-                                   placeholder="Technical constraints preventing immediate patching..."/>
+                        <!-- Column 1: Assignees & Ownership -->
+                        <group string="👤 Assignees &amp; Responsibilities">
+                            <field name="requester_id" string="Requested By (Submitter)"/>
+                            <field name="owner_id" string="Risk Owner (Accountable)"/>
+                            <field name="reviewer_id" string="Security Reviewer"/>
+                            <field name="approver_id" string="Approving Manager"/>
                         </group>
 
-                        <!-- Column 2: Risk Ranking & Timeline -->
-                        <group string="2. Risk Ranking &amp; Target Timeline">
-                            <field name="risk_level" widget="radio" options="{'horizontal': true}"/>
-                            <field name="likelihood"/>
-                            <separator string="Workflow Assignees"/>
-                            <field name="reviewer_id"/>
-                            <field name="approver_id"/>
-                            <separator string="Lifecycle Deadlines"/>
-                            <field name="start_date"/>
-                            <field name="review_date"/>
-                            <field name="expiration_date"/>
-                            <field name="days_until_expiry" readonly="1"/>
+                        <!-- Column 2: Risk Severity & Timeline -->
+                        <group string="⚡ Risk Ranking &amp; Deadlines">
+                            <field name="risk_level" string="Risk Severity" widget="radio" options="{'horizontal': true}"/>
+                            <field name="likelihood" string="Exploit Likelihood" widget="radio" options="{'horizontal': true}"/>
+                            <separator string="Target Deadlines"/>
+                            <field name="start_date" string="Effective Start Date"/>
+                            <field name="review_date" string="Scheduled Review Date"/>
+                            <field name="expiration_date" string="Expiration Deadline"/>
+                            <field name="days_until_expiry" string="Days Remaining" readonly="1"/>
                             <field name="is_expired" invisible="1"/>
-                            <field name="renewal_count" invisible="renewal_count == 0"/>
+                            <field name="renewal_count" string="Renewal Count" invisible="renewal_count == 0"/>
                         </group>
                     </group>
 
-                    <!-- Notebook Tabs for Detailed Information -->
-                    <notebook>
-                        <!-- Tab 1: Detailed Summary & Impact -->
-                        <page string="Detailed Summary &amp; Impact" name="details">
-                            <group>
-                                <field name="description" placeholder="Describe the full system architecture and vulnerability details..."/>
-                            </group>
-                            <group string="Impact Assessment">
-                                <field name="impact" placeholder="What is the potential impact if this risk is exploited?"/>
-                                <field name="risk_description" placeholder="CVSS scores, CVE IDs, or technical vectors..."/>
-                            </group>
-                        </page>
+                    <!-- Main Section: Justification & Description (Right in front of user) -->
+                    <group string="📝 Details &amp; Justification">
+                        <field name="business_justification"
+                               string="Business Justification"
+                               placeholder="Why is this security exception necessary? (e.g. Vendor delay, critical business dependence)..."/>
+                        <field name="technical_justification"
+                               string="Technical Justification"
+                               placeholder="What technical obstacles prevent fixing this issue immediately?..."/>
+                        <field name="description"
+                               string="Full Summary"
+                               placeholder="Detailed technical summary of the affected system, architecture, or vulnerability..."/>
+                    </group>
 
-                        <!-- Tab 2: Compensating Risk Controls -->
-                        <page string="Compensating Risk Controls" name="controls">
+                    <!-- Notebook Tabs for Controls & Verification -->
+                    <notebook>
+                        <!-- Tab 1: Compensating Controls -->
+                        <page string="🛡 Compensating Risk Controls" name="controls">
                             <field name="control_ids">
                                 <list editable="bottom">
-                                    <field name="sequence" widget="handle"/>
+                                    <field name="sequence" widget="handle" string=" "/>
                                     <field name="name" string="Control Name"/>
-                                    <field name="control_type"/>
-                                    <field name="status" widget="badge"/>
-                                    <field name="responsible_id"/>
-                                    <field name="implementation_date"/>
+                                    <field name="control_type" string="Control Type"/>
+                                    <field name="status" string="Status" widget="badge"/>
+                                    <field name="responsible_id" string="Responsible Person"/>
+                                    <field name="implementation_date" string="Date Implemented"/>
                                 </list>
                             </field>
                         </page>
 
-                        <!-- Tab 3: Verification & Audit -->
-                        <page string="Remediation Verification" name="verification"
+                        <!-- Tab 2: Detailed Impact Assessment -->
+                        <page string="📊 Risk Impact Assessment" name="impact_assessment">
+                            <group>
+                                <field name="impact" string="Business Impact" placeholder="What is the potential impact if this risk is exploited?"/>
+                                <field name="risk_description" string="Technical Risk Details" placeholder="CVSS scores, CVE IDs, or technical vectors..."/>
+                            </group>
+                        </page>
+
+                        <!-- Tab 3: Remediation Verification -->
+                        <page string="🔍 Remediation Verification" name="verification"
                               invisible="state not in ('pending_verification', 'closed')">
                             <group>
                                 <group string="Verification Outcome">
-                                    <field name="verification_result"/>
-                                    <field name="verified_by_id"/>
-                                    <field name="verification_date"/>
+                                    <field name="verification_result" string="Outcome"/>
+                                    <field name="verified_by_id" string="Verified By"/>
+                                    <field name="verification_date" string="Verification Date"/>
                                 </group>
                                 <group string="Audit Findings">
                                     <field name="verification_notes"
-                                           placeholder="Record vulnerability scan results or physical audit findings..."/>
+                                           string="Verification Findings"
+                                           placeholder="Record vulnerability scan results or security audit evidence..."/>
                                 </group>
                             </group>
                         </page>
@@ -243,14 +249,14 @@
                   decoration-danger="risk_level == 'critical' or is_expired == True"
                   decoration-warning="risk_level == 'high'"
                   decoration-muted="state == 'closed'">
-                <field name="reference"/>
-                <field name="name"/>
-                <field name="owner_id"/>
-                <field name="risk_level" widget="badge"/>
-                <field name="state" widget="badge"/>
-                <field name="review_date"/>
-                <field name="expiration_date"/>
-                <field name="days_until_expiry"/>
+                <field name="reference" string="Reference ID"/>
+                <field name="name" string="Exception Title"/>
+                <field name="owner_id" string="Risk Owner"/>
+                <field name="risk_level" string="Risk Severity" widget="badge"/>
+                <field name="state" string="Status Stage" widget="badge"/>
+                <field name="review_date" string="Scheduled Review Date"/>
+                <field name="expiration_date" string="Expiration Deadline"/>
+                <field name="days_until_expiry" string="Days Remaining"/>
                 <field name="is_expired" column_invisible="1"/>
             </list>
         </field>
@@ -264,11 +270,11 @@
         <field name="model">security.exception</field>
         <field name="arch" type="xml">
             <search>
-                <field name="name"/>
-                <field name="reference"/>
-                <field name="owner_id"/>
-                <field name="reviewer_id"/>
-                <field name="requester_id"/>
+                <field name="name" string="Title"/>
+                <field name="reference" string="Reference ID"/>
+                <field name="owner_id" string="Risk Owner"/>
+                <field name="reviewer_id" string="Security Reviewer"/>
+                <field name="requester_id" string="Requested By"/>
 
                 <!-- Filters -->
                 <filter name="filter_my_exceptions"
@@ -305,7 +311,7 @@
     </record>
 
     <!-- ================================================================== -->
-    <!-- WINDOW ACTIONS (Default view mode is KANBAN for easy visual UI)    -->
+    <!-- WINDOW ACTIONS                                                      -->
     <!-- ================================================================== -->
 
     <!-- All Exceptions -->
