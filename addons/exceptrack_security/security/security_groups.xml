@@ -47,12 +47,11 @@
         <field name="comment">Approve or reject security exceptions.</field>
     </record>
 
-    <!-- Administrator: Full configuration access (implies Manager & auto-assigned to Admin users) -->
+    <!-- Administrator: Full configuration access (implies Manager) -->
     <record id="group_exceptrack_admin" model="res.groups">
         <field name="name">Administrator</field>
         <field name="privilege_id" ref="privilege_exceptrack"/>
         <field name="implied_ids" eval="[(4, ref('group_exceptrack_manager'))]"/>
-        <field name="users" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
         <field name="comment">Full administrative access to ExcepTrack configuration.</field>
     </record>
 
