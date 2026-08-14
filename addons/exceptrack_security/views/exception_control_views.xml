@@ -34,13 +34,13 @@
     </record>
 
     <!-- ================================================================== -->
-    <!-- TREE VIEW — Compensating Control (standalone)                       -->
+    <!-- LIST VIEW — Compensating Control (Odoo 19: <list> replaces <tree>)  -->
     <!-- ================================================================== -->
-    <record id="view_exception_control_tree" model="ir.ui.view">
-        <field name="name">security.exception.control.tree</field>
+    <record id="view_exception_control_list" model="ir.ui.view">
+        <field name="name">security.exception.control.list</field>
         <field name="model">security.exception.control</field>
         <field name="arch" type="xml">
-            <tree string="Compensating Controls">
+            <list string="Compensating Controls" editable="bottom">
                 <field name="sequence" widget="handle"/>
                 <field name="name"/>
                 <field name="control_type"/>
@@ -52,7 +52,7 @@
                 <field name="responsible_id"/>
                 <field name="implementation_date"/>
                 <field name="exception_id"/>
-            </tree>
+            </list>
         </field>
     </record>
 
