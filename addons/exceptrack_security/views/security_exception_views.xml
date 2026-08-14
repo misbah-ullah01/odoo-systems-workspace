@@ -167,16 +167,16 @@
                         </h3>
                     </div>
 
-                    <!-- Section 1: Assignees & Responsibilities (Filtered Dropdowns) -->
+                    <!-- Section 1: Assignees & Responsibilities -->
                     <group>
                         <group string="👤 Assignees &amp; Responsibilities">
                             <field name="requester_id" string="Requested By (Submitter)" readonly="1"/>
                             <field name="owner_id" string="Risk Owner (Accountable)" readonly="state != 'draft'"/>
                             <field name="reviewer_id" string="Security Reviewer"
-                                   domain="[('groups_id', 'in', [ref('exceptrack_security.group_exceptrack_reviewer')]), ('share', '=', False)]"
+                                   domain="[('share', '=', False)]"
                                    readonly="state not in ('draft', 'assessment', 'review')"/>
                             <field name="approver_id" string="Approving Manager"
-                                   domain="[('groups_id', 'in', [ref('exceptrack_security.group_exceptrack_manager')]), ('share', '=', False)]"
+                                   domain="[('share', '=', False)]"
                                    readonly="state not in ('draft', 'review', 'pending_approval')"/>
                         </group>
 
