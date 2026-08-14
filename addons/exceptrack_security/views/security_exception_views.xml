@@ -179,7 +179,7 @@
                     </notebook>
                 </sheet>
 
-                <!-- Chatter (Standard Odoo div format for maximum compatibility) -->
+                <!-- Chatter -->
                 <div class="oe_chatter">
                     <field name="message_follower_ids"/>
                     <field name="activity_ids"/>
@@ -220,7 +220,7 @@
     </record>
 
     <!-- ================================================================== -->
-    <!-- SEARCH VIEW (100% Standard Odoo Search View)                        -->
+    <!-- SEARCH VIEW (Odoo 19: <group> tag inside <search> has NO attributes) -->
     <!-- ================================================================== -->
     <record id="view_security_exception_search" model="ir.ui.view">
         <field name="name">security.exception.search</field>
@@ -251,8 +251,9 @@
                         string="Closed"
                         domain="[('state', '=', 'closed')]"/>
 
-                <!-- Group By -->
-                <group string="Group By">
+                <!-- Group By (Odoo 19: <separator string="Group By"/> before bare <group>) -->
+                <separator string="Group By"/>
+                <group>
                     <filter name="groupby_state"
                             string="Status"
                             context="{'group_by': 'state'}"/>
