@@ -216,14 +216,14 @@
     </record>
 
     <!-- ================================================================== -->
-    <!-- SEARCH VIEW (Odoo 19: clean <search> tag without string attribute)  -->
+    <!-- SEARCH VIEW                                                         -->
     <!-- ================================================================== -->
     <record id="view_security_exception_search" model="ir.ui.view">
         <field name="name">security.exception.search</field>
         <field name="model">security.exception</field>
         <field name="arch" type="xml">
             <search>
-                <field name="name"/>
+                <field name="name" string="Title" filter_domain="['|', ('name', 'ilike', self), ('reference', 'ilike', self)]"/>
                 <field name="reference"/>
                 <field name="owner_id"/>
                 <field name="reviewer_id"/>
@@ -233,9 +233,6 @@
                 <filter name="filter_my_exceptions"
                         string="My Exceptions"
                         domain="['|', ('requester_id', '=', uid), ('owner_id', '=', uid)]"/>
-                <filter name="filter_to_review"
-                        string="To Review"
-                        domain="[('reviewer_id', '=', uid), ('state', 'in', ('review', 'pending_verification'))]"/>
                 <separator/>
                 <filter name="filter_draft"
                         string="Draft"
@@ -246,29 +243,9 @@
                 <filter name="filter_pending_approval"
                         string="Pending Approval"
                         domain="[('state', '=', 'pending_approval')]"/>
-                <filter name="filter_pending_verification"
-                        string="Pending Verification"
-                        domain="[('state', '=', 'pending_verification')]"/>
                 <filter name="filter_closed"
                         string="Closed"
                         domain="[('state', '=', 'closed')]"/>
-                <filter name="filter_rejected"
-                        string="Rejected"
-                        domain="[('state', '=', 'rejected')]"/>
-                <separator/>
-                <filter name="filter_high_risk"
-                        string="High Risk"
-                        domain="[('risk_level', '=', 'high')]"/>
-                <filter name="filter_critical_risk"
-                        string="Critical Risk"
-                        domain="[('risk_level', '=', 'critical')]"/>
-                <separator/>
-                <filter name="filter_expiring_soon"
-                        string="Expiring Soon"
-                        domain="[('days_until_expiry', '&gt;', 0), ('days_until_expiry', '&lt;=', 14)]"/>
-                <filter name="filter_expired"
-                        string="Expired"
-                        domain="[('is_expired', '=', True)]"/>
 
                 <!-- Group By -->
                 <group expand="0" string="Group By">
@@ -281,12 +258,6 @@
                     <filter name="groupby_owner"
                             string="Owner"
                             context="{'group_by': 'owner_id'}"/>
-                    <filter name="groupby_reviewer"
-                            string="Reviewer"
-                            context="{'group_by': 'reviewer_id'}"/>
-                    <filter name="groupby_expiration"
-                            string="Expiration Date"
-                            context="{'group_by': 'expiration_date'}"/>
                 </group>
             </search>
         </field>
@@ -329,7 +300,6 @@
         <field name="res_model">security.exception</field>
         <field name="view_mode">list,form</field>
         <field name="search_view_id" ref="view_security_exception_search"/>
-        <field name="context">{'search_default_filter_to_review': 1}</field>
     </record>
 
 </odoo>
