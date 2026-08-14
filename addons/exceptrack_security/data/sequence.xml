@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================== -->
+    <!-- SEQUENCE — Security Exception Reference                             -->
+    <!-- ================================================================== -->
+    <record id="sequence_security_exception" model="ir.sequence">
+        <field name="name">Security Exception Sequence</field>
+        <field name="code">security.exception.sequence</field>
+        <field name="prefix">SEC-EXC/</field>
+        <field name="padding">5</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+    </record>
+
+</odoo>

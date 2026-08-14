@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================== -->
+    <!-- ROOT MENU                                                           -->
+    <!-- ================================================================== -->
+    <menuitem id="menu_exceptrack_root"
+              name="ExcepTrack"
+              web_icon="exceptrack_security,static/description/icon.png"
+              sequence="90"/>
+
+    <!-- ================================================================== -->
+    <!-- EXCEPTIONS SUBMENU                                                  -->
+    <!-- ================================================================== -->
+    <menuitem id="menu_exceptrack_exceptions"
+              name="Exceptions"
+              parent="menu_exceptrack_root"
+              sequence="10"/>
+
+    <menuitem id="menu_exceptrack_all_exceptions"
+              name="All Exceptions"
+              parent="menu_exceptrack_exceptions"
+              action="action_security_exception"
+              sequence="10"/>
+
+    <menuitem id="menu_exceptrack_my_exceptions"
+              name="My Exceptions"
+              parent="menu_exceptrack_exceptions"
+              action="action_security_exception_my"
+              sequence="20"/>
+
+    <menuitem id="menu_exceptrack_to_review"
+              name="To Review"
+              parent="menu_exceptrack_exceptions"
+              action="action_security_exception_to_review"
+              sequence="30"/>
+
+    <!-- ================================================================== -->
+    <!-- CONFIGURATION SUBMENU (Admin only)                                  -->
+    <!-- ================================================================== -->
+    <menuitem id="menu_exceptrack_configuration"
+              name="Configuration"
+              parent="menu_exceptrack_root"
+              groups="exceptrack_security.group_exceptrack_admin"
+              sequence="90"/>
+
+</odoo>

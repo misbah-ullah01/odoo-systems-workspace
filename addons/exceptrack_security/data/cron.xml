@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================== -->
+    <!-- SCHEDULED ACTION — Check Expiring Exceptions                        -->
+    <!-- ================================================================== -->
+    <record id="cron_check_expiring_exceptions" model="ir.cron">
+        <field name="name">ExcepTrack: Check Expiring Exceptions</field>
+        <field name="model_id" ref="model_security_exception"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_check_expiring_exceptions()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="numbercall">-1</field>
+        <field name="active">True</field>
+    </record>
+
+</odoo>

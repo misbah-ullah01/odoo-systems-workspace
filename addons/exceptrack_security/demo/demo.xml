@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================== -->
+    <!-- DEMO DATA — Security Exceptions                                     -->
+    <!-- ================================================================== -->
+
+    <!-- Exception 1: Active, High Risk -->
+    <record id="demo_exception_01" model="security.exception">
+        <field name="name">Legacy Authentication Server — TLS 1.0 Deprecation</field>
+        <field name="description"><![CDATA[
+            <p>The legacy authentication server (auth-legacy-01) still requires TLS 1.0
+            for backward compatibility with older client applications. TLS 1.0 has known
+            vulnerabilities and should be disabled, but cannot be removed until all
+            clients are migrated to TLS 1.2+.</p>
+        ]]></field>
+        <field name="requester_id" ref="base.user_admin"/>
+        <field name="owner_id" ref="base.user_admin"/>
+        <field name="reviewer_id" ref="base.user_admin"/>
+        <field name="approver_id" ref="base.user_admin"/>
+        <field name="risk_level">high</field>
+        <field name="likelihood">medium</field>
+        <field name="impact">Potential man-in-the-middle attacks on legacy authentication traffic. Affects approximately 15% of client connections.</field>
+        <field name="risk_description">TLS 1.0 is vulnerable to BEAST and POODLE attacks. While compensating controls reduce exposure, the risk remains elevated until full migration.</field>
+        <field name="business_justification">Critical business applications depend on legacy clients that only support TLS 1.0. Immediate removal would disrupt operations for approximately 200 users.</field>
+        <field name="technical_justification">Client migration requires firmware updates that are scheduled over the next 90 days. A parallel TLS 1.2 endpoint has been deployed for migrated clients.</field>
+        <field name="start_date" eval="(datetime.date.today() - datetime.timedelta(days=30)).strftime('%Y-%m-%d')"/>
+        <field name="review_date" eval="(datetime.date.today() + datetime.timedelta(days=30)).strftime('%Y-%m-%d')"/>
+        <field name="expiration_date" eval="(datetime.date.today() + datetime.timedelta(days=60)).strftime('%Y-%m-%d')"/>
+        <field name="state">active</field>
+    </record>
+
+    <!-- Control for Exception 1 -->
+    <record id="demo_control_01a" model="security.exception.control">
+        <field name="exception_id" ref="demo_exception_01"/>
+        <field name="name">Network Segmentation for Legacy Auth</field>
+        <field name="control_type">segmentation</field>
+        <field name="status">implemented</field>
+        <field name="responsible_id" ref="base.user_admin"/>
+        <field name="description">Legacy authentication server isolated to a dedicated VLAN with restricted access from only known client subnets.</field>
+        <field name="implementation_date" eval="(datetime.date.today() - datetime.timedelta(days=28)).strftime('%Y-%m-%d')"/>
+    </record>
+
+    <record id="demo_control_01b" model="security.exception.control">
+        <field name="exception_id" ref="demo_exception_01"/>
+        <field name="name">Enhanced TLS Traffic Monitoring</field>
+        <field name="control_type">monitoring</field>
+        <field name="status">implemented</field>
+        <field name="responsible_id" ref="base.user_admin"/>
+        <field name="description">IDS rules configured to detect anomalous TLS 1.0 handshake patterns and alert the SOC.</field>
+        <field name="implementation_date" eval="(datetime.date.today() - datetime.timedelta(days=25)).strftime('%Y-%m-%d')"/>
+    </record>
+
+    <!-- Exception 2: Pending Approval, Critical Risk -->
+    <record id="demo_exception_02" model="security.exception">
+        <field name="name">Unpatched Database Server — CVE-2025-XXXX</field>
+        <field name="description"><![CDATA[
+            <p>Production database server (db-prod-03) cannot be patched for
+            CVE-2025-XXXX due to vendor certification requirements. The patch
+            requires a major version upgrade which must be validated by the
+            application vendor before deployment.</p>
+        ]]></field>
+        <field name="requester_id" ref="base.user_admin"/>
+        <field name="owner_id" ref="base.user_admin"/>
+        <field name="reviewer_id" ref="base.user_admin"/>
+        <field name="approver_id" ref="base.user_admin"/>
+        <field name="risk_level">critical</field>
+        <field name="likelihood">high</field>
+        <field name="impact">Remote code execution vulnerability. If exploited, could lead to full database compromise including customer PII.</field>
+        <field name="risk_description">CVSS 9.8 vulnerability with known exploit code available. Database contains sensitive financial and personal data.</field>
+        <field name="business_justification">Vendor certification process requires 45 days. Applying the patch without certification would void the support contract and potentially destabilize the production environment.</field>
+        <field name="technical_justification">The patch requires PostgreSQL major version upgrade (14 → 16). Application compatibility testing is underway but not yet complete.</field>
+        <field name="start_date" eval="(datetime.date.today()).strftime('%Y-%m-%d')"/>
+        <field name="review_date" eval="(datetime.date.today() + datetime.timedelta(days=21)).strftime('%Y-%m-%d')"/>
+        <field name="expiration_date" eval="(datetime.date.today() + datetime.timedelta(days=45)).strftime('%Y-%m-%d')"/>
+        <field name="state">pending_approval</field>
+    </record>
+
+    <record id="demo_control_02a" model="security.exception.control">
+        <field name="exception_id" ref="demo_exception_02"/>
+        <field name="name">Database Firewall Rules</field>
+        <field name="control_type">network</field>
+        <field name="status">implemented</field>
+        <field name="responsible_id" ref="base.user_admin"/>
+        <field name="description">Database access restricted to application servers only. All direct connections blocked at the firewall level.</field>
+    </record>
+
+    <record id="demo_control_02b" model="security.exception.control">
+        <field name="exception_id" ref="demo_exception_02"/>
+        <field name="name">Database Activity Logging</field>
+        <field name="control_type">logging</field>
+        <field name="status">implemented</field>
+        <field name="responsible_id" ref="base.user_admin"/>
+        <field name="description">All database queries logged and forwarded to SIEM for real-time analysis and anomaly detection.</field>
+    </record>
+
+    <!-- Exception 3: Draft, Medium Risk -->
+    <record id="demo_exception_03" model="security.exception">
+        <field name="name">Shared Service Account — Legacy Batch Processing</field>
+        <field name="description"><![CDATA[
+            <p>The nightly batch processing system uses a shared service account
+            (svc_batch_legacy) rather than individual service accounts per
+            application. This violates the principle of least privilege and
+            makes audit attribution difficult.</p>
+        ]]></field>
+        <field name="requester_id" ref="base.user_admin"/>
+        <field name="owner_id" ref="base.user_admin"/>
+        <field name="risk_level">medium</field>
+        <field name="likelihood">low</field>
+        <field name="impact">Compromised shared account would grant access to multiple batch systems. Audit logs cannot distinguish between applications using the same account.</field>
+        <field name="business_justification">Migrating to individual service accounts requires reconfiguration of 12 batch jobs across 4 departments. The migration is planned but resource-constrained.</field>
+        <field name="state">draft</field>
+    </record>
+
+    <!-- Exception 4: Closed, Low Risk -->
+    <record id="demo_exception_04" model="security.exception">
+        <field name="name">Temporary WiFi Access — Office Renovation</field>
+        <field name="description"><![CDATA[
+            <p>During the 3rd floor renovation, employees required temporary
+            access to the guest WiFi network for workstations that could not
+            be connected to the wired network. The guest network has reduced
+            security controls compared to the corporate network.</p>
+        ]]></field>
+        <field name="requester_id" ref="base.user_admin"/>
+        <field name="owner_id" ref="base.user_admin"/>
+        <field name="reviewer_id" ref="base.user_admin"/>
+        <field name="approver_id" ref="base.user_admin"/>
+        <field name="risk_level">low</field>
+        <field name="likelihood">low</field>
+        <field name="impact">Employees on guest network bypass network-level DLP and advanced threat protection. Limited to 3rd floor personnel during renovation.</field>
+        <field name="business_justification">Office renovation required disconnecting wired network drops. Employees needed connectivity to continue working.</field>
+        <field name="technical_justification">VPN enforcement was enabled on all affected workstations to tunnel traffic through the corporate network despite using guest WiFi.</field>
+        <field name="start_date" eval="(datetime.date.today() - datetime.timedelta(days=90)).strftime('%Y-%m-%d')"/>
+        <field name="review_date" eval="(datetime.date.today() - datetime.timedelta(days=30)).strftime('%Y-%m-%d')"/>
+        <field name="expiration_date" eval="(datetime.date.today() - datetime.timedelta(days=10)).strftime('%Y-%m-%d')"/>
+        <field name="state">closed</field>
+        <field name="verification_result">pass</field>
+        <field name="verified_by_id" ref="base.user_admin"/>
+        <field name="verification_date" eval="(datetime.date.today() - datetime.timedelta(days=12)).strftime('%Y-%m-%d')"/>
+        <field name="verification_notes">Renovation complete. All workstations reconnected to corporate wired network. Guest WiFi access removed. Verified via network scan — no remaining corporate devices on guest VLAN.</field>
+    </record>
+
+    <record id="demo_control_04a" model="security.exception.control">
+        <field name="exception_id" ref="demo_exception_04"/>
+        <field name="name">Mandatory VPN for Guest WiFi</field>
+        <field name="control_type">access</field>
+        <field name="status">verified</field>
+        <field name="responsible_id" ref="base.user_admin"/>
+        <field name="description">All workstations configured with always-on VPN when connected to guest WiFi, ensuring traffic is routed through corporate security controls.</field>
+        <field name="implementation_date" eval="(datetime.date.today() - datetime.timedelta(days=89)).strftime('%Y-%m-%d')"/>
+    </record>
+
+    <!-- Exception 5: Under Review, High Risk -->
+    <record id="demo_exception_05" model="security.exception">
+        <field name="name">Unsupported Operating System — Manufacturing Floor</field>
+        <field name="description"><![CDATA[
+            <p>Manufacturing floor control systems run Windows Server 2012 R2,
+            which is no longer receiving security updates. Upgrading requires
+            vendor recertification of the SCADA/HMI software, which is
+            currently scheduled for Q3.</p>
+        ]]></field>
+        <field name="requester_id" ref="base.user_admin"/>
+        <field name="owner_id" ref="base.user_admin"/>
+        <field name="reviewer_id" ref="base.user_admin"/>
+        <field name="approver_id" ref="base.user_admin"/>
+        <field name="risk_level">high</field>
+        <field name="likelihood">medium</field>
+        <field name="impact">Unpatched OS vulnerable to multiple known exploits. Manufacturing systems contain proprietary process data and control critical production equipment.</field>
+        <field name="risk_description">Multiple CVEs affecting Windows Server 2012 R2 remain unpatched. System is air-gapped but accessible via jump server for maintenance.</field>
+        <field name="business_justification">SCADA vendor requires recertification before OS upgrade. Unplanned upgrade could void manufacturing warranty and halt production.</field>
+        <field name="technical_justification">OS upgrade requires SCADA software v7.x which is currently in vendor testing. ETA for certified release is 60 days.</field>
+        <field name="start_date" eval="(datetime.date.today() - datetime.timedelta(days=60)).strftime('%Y-%m-%d')"/>
+        <field name="review_date" eval="(datetime.date.today() + datetime.timedelta(days=5)).strftime('%Y-%m-%d')"/>
+        <field name="expiration_date" eval="(datetime.date.today() + datetime.timedelta(days=30)).strftime('%Y-%m-%d')"/>
+        <field name="state">under_review</field>
+        <field name="renewal_count">1</field>
+    </record>
+
+    <record id="demo_control_05a" model="security.exception.control">
+        <field name="exception_id" ref="demo_exception_05"/>
+        <field name="name">Air Gap Enforcement</field>
+        <field name="control_type">segmentation</field>
+        <field name="status">verified</field>
+        <field name="responsible_id" ref="base.user_admin"/>
+        <field name="description">Manufacturing systems physically isolated from corporate network. Access only via dedicated jump server with MFA.</field>
+        <field name="implementation_date" eval="(datetime.date.today() - datetime.timedelta(days=58)).strftime('%Y-%m-%d')"/>
+    </record>
+
+    <record id="demo_control_05b" model="security.exception.control">
+        <field name="exception_id" ref="demo_exception_05"/>
+        <field name="name">Weekly Manual Security Review</field>
+        <field name="control_type">manual</field>
+        <field name="status">implemented</field>
+        <field name="responsible_id" ref="base.user_admin"/>
+        <field name="description">Weekly review of jump server access logs and manufacturing system event logs for indicators of compromise.</field>
+    </record>
+
+</odoo>

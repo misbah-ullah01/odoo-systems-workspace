@@ -1,1 +1,57 @@
+# === Instructions (private) ===
 instructions.txt
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+*.whl
+
+# === Virtual Environments ===
+.venv/
+venv/
+env/
+ENV/
+
+# === Environment & Secrets ===
+.env
+.env.*
+*.key
+*.pem
+
+# === Odoo ===
+*.log
+*.pid
+filestore/
+sessions/
+addons/*/static/lib/
+
+# === IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# === OS ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Node (if OWL dev needed) ===
+node_modules/
+package-lock.json
+
+# === Misc ===
+*.bak
+*.tmp
+*.temp

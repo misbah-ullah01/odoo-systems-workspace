@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================== -->
+    <!-- FORM VIEW — Compensating Control (standalone)                       -->
+    <!-- ================================================================== -->
+    <record id="view_exception_control_form" model="ir.ui.view">
+        <field name="name">security.exception.control.form</field>
+        <field name="model">security.exception.control</field>
+        <field name="arch" type="xml">
+            <form string="Compensating Control">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="control_type"/>
+                            <field name="status"/>
+                        </group>
+                        <group>
+                            <field name="exception_id"/>
+                            <field name="responsible_id"/>
+                            <field name="implementation_date"/>
+                        </group>
+                    </group>
+                    <group string="Details">
+                        <field name="description"
+                               placeholder="Describe this compensating control..."/>
+                        <field name="notes"
+                               placeholder="Additional notes..."/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ================================================================== -->
+    <!-- TREE VIEW — Compensating Control (standalone)                       -->
+    <!-- ================================================================== -->
+    <record id="view_exception_control_tree" model="ir.ui.view">
+        <field name="name">security.exception.control.tree</field>
+        <field name="model">security.exception.control</field>
+        <field name="arch" type="xml">
+            <tree string="Compensating Controls">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="control_type"/>
+                <field name="status"
+                       widget="badge"
+                       decoration-info="status == 'planned'"
+                       decoration-warning="status == 'implemented'"
+                       decoration-success="status == 'verified'"/>
+                <field name="responsible_id"/>
+                <field name="implementation_date"/>
+                <field name="exception_id"/>
+            </tree>
+        </field>
+    </record>
+
+</odoo>

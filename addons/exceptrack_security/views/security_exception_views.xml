@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================== -->
+    <!-- FORM VIEW                                                           -->
+    <!-- ================================================================== -->
+    <record id="view_security_exception_form" model="ir.ui.view">
+        <field name="name">security.exception.form</field>
+        <field name="model">security.exception</field>
+        <field name="arch" type="xml">
+            <form string="Security Exception">
+                <header>
+                    <!-- Workflow Buttons -->
+                    <button name="action_submit"
+                            string="Submit"
+                            type="object"
+                            class="oe_highlight"
+                            states="draft"/>
+                    <button name="action_assess"
+                            string="Complete Assessment"
+                            type="object"
+                            class="oe_highlight"
+                            states="assessment"/>
+                    <button name="action_recommend_approval"
+                            string="Recommend Approval"
+                            type="object"
+                            class="oe_highlight"
+                            states="review"/>
+                    <button name="action_reject"
+                            string="Reject"
+                            type="object"
+                            class="btn-secondary"
+                            states="review,pending_approval"/>
+                    <button name="action_approve"
+                            string="Approve"
+                            type="object"
+                            class="oe_highlight"
+                            states="pending_approval"/>
+                    <button name="action_initiate_review"
+                            string="Initiate Review"
+                            type="object"
+                            class="oe_highlight"
+                            states="active"/>
+                    <button name="action_renew"
+                            string="Renew"
+                            type="object"
+                            class="oe_highlight"
+                            states="under_review"/>
+                    <button name="action_request_verification"
+                            string="Request Verification"
+                            type="object"
+                            class="btn-secondary"
+                            states="under_review"/>
+                    <button name="action_verify_pass"
+                            string="Verify — Pass"
+                            type="object"
+                            class="oe_highlight"
+                            states="pending_verification"/>
+                    <button name="action_verify_fail"
+                            string="Verify — Fail"
+                            type="object"
+                            class="btn-danger"
+                            states="pending_verification"/>
+                    <button name="action_revise"
+                            string="Revise"
+                            type="object"
+                            class="btn-secondary"
+                            states="rejected"/>
+
+                    <!-- Status Bar -->
+                    <field name="state"
+                           widget="statusbar"
+                           statusbar_visible="draft,assessment,review,pending_approval,active,closed"/>
+                </header>
+
+                <sheet>
+                    <!-- Alert Banners -->
+                    <div class="alert alert-warning" role="alert"
+                         attrs="{'invisible': [('is_expired', '=', False)]}">
+                        <strong>⚠ This exception has expired!</strong>
+                        Please initiate a review to renew or close this exception.
+                    </div>
+
+                    <div class="oe_title">
+                        <h1>
+                            <field name="reference" readonly="1"/>
+                        </h1>
+                        <h2>
+                            <field name="name" placeholder="Exception Title..."
+                                   attrs="{'readonly': [('state', 'in', ['closed', 'rejected'])]}"/>
+                        </h2>
+                    </div>
+
+                    <group>
+                        <group string="Ownership">
+                            <field name="requester_id"/>
+                            <field name="owner_id"/>
+                            <field name="reviewer_id"/>
+                            <field name="approver_id"/>
+                        </group>
+                        <group string="Risk Assessment">
+                            <field name="risk_level"
+                                   widget="radio"
+                                   options="{'horizontal': true}"/>
+                            <field name="likelihood"/>
+                            <field name="days_until_expiry"/>
+                            <field name="is_expired" invisible="1"/>
+                            <field name="renewal_count"
+                                   attrs="{'invisible': [('renewal_count', '=', 0)]}"/>
+                        </group>
+                    </group>
+
+                    <group>
+                        <group string="Dates">
+                            <field name="start_date"/>
+                            <field name="review_date"/>
+                            <field name="expiration_date"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <!-- Description Tab -->
+                        <page string="Description" name="description">
+                            <field name="description"
+                                   placeholder="Describe the security exception in detail..."/>
+                        </page>
+
+                        <!-- Risk Details Tab -->
+                        <page string="Risk Details" name="risk_details">
+                            <group>
+                                <field name="impact" placeholder="Describe the potential impact..."/>
+                            </group>
+                            <group>
+                                <field name="risk_description" placeholder="Describe the risk in detail..."/>
+                            </group>
+                        </page>
+
+                        <!-- Justification Tab -->
+                        <page string="Justification" name="justification">
+                            <group>
+                                <field name="business_justification"
+                                       placeholder="Why is this exception necessary from a business perspective?"/>
+                            </group>
+                            <group>
+                                <field name="technical_justification"
+                                       placeholder="What are the technical reasons for this exception?"/>
+                            </group>
+                        </page>
+
+                        <!-- Compensating Controls Tab -->
+                        <page string="Compensating Controls" name="controls">
+                            <field name="control_ids">
+                                <tree editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="control_type"/>
+                                    <field name="status"/>
+                                    <field name="responsible_id"/>
+                                    <field name="implementation_date"/>
+                                </tree>
+                            </field>
+                        </page>
+
+                        <!-- Verification Tab -->
+                        <page string="Verification" name="verification"
+                              attrs="{'invisible': [('state', 'not in', ['pending_verification', 'closed'])]}">
+                            <group>
+                                <group>
+                                    <field name="verification_result"/>
+                                    <field name="verified_by_id"/>
+                                    <field name="verification_date"/>
+                                </group>
+                                <group>
+                                    <field name="verification_notes"
+                                           placeholder="Describe verification findings..."/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+
+                <!-- Chatter -->
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- ================================================================== -->
+    <!-- LIST / TREE VIEW                                                    -->
+    <!-- ================================================================== -->
+    <record id="view_security_exception_tree" model="ir.ui.view">
+        <field name="name">security.exception.tree</field>
+        <field name="model">security.exception</field>
+        <field name="arch" type="xml">
+            <tree string="Security Exceptions"
+                  decoration-danger="risk_level == 'critical' or is_expired == True"
+                  decoration-warning="risk_level == 'high'"
+                  decoration-muted="state == 'closed'">
+                <field name="reference"/>
+                <field name="name"/>
+                <field name="owner_id"/>
+                <field name="risk_level"/>
+                <field name="state"
+                       widget="badge"
+                       decoration-info="state in ('draft', 'assessment')"
+                       decoration-warning="state in ('review', 'pending_approval', 'under_review')"
+                       decoration-success="state == 'active'"
+                       decoration-danger="state in ('rejected', 'pending_verification')"
+                       decoration-muted="state == 'closed'"/>
+                <field name="review_date"/>
+                <field name="expiration_date"/>
+                <field name="days_until_expiry"/>
+                <field name="is_expired" column_invisible="1"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- ================================================================== -->
+    <!-- SEARCH VIEW                                                         -->
+    <!-- ================================================================== -->
+    <record id="view_security_exception_search" model="ir.ui.view">
+        <field name="name">security.exception.search</field>
+        <field name="model">security.exception</field>
+        <field name="arch" type="xml">
+            <search string="Search Security Exceptions">
+                <field name="name"/>
+                <field name="reference"/>
+                <field name="owner_id"/>
+                <field name="reviewer_id"/>
+                <field name="requester_id"/>
+
+                <!-- Filters -->
+                <filter name="filter_my_exceptions"
+                        string="My Exceptions"
+                        domain="['|', ('requester_id', '=', uid), ('owner_id', '=', uid)]"/>
+                <filter name="filter_to_review"
+                        string="To Review"
+                        domain="[('reviewer_id', '=', uid), ('state', 'in', ['review', 'pending_verification'])]"/>
+                <separator/>
+                <filter name="filter_draft"
+                        string="Draft"
+                        domain="[('state', '=', 'draft')]"/>
+                <filter name="filter_active"
+                        string="Active"
+                        domain="[('state', '=', 'active')]"/>
+                <filter name="filter_pending_approval"
+                        string="Pending Approval"
+                        domain="[('state', '=', 'pending_approval')]"/>
+                <filter name="filter_pending_verification"
+                        string="Pending Verification"
+                        domain="[('state', '=', 'pending_verification')]"/>
+                <filter name="filter_closed"
+                        string="Closed"
+                        domain="[('state', '=', 'closed')]"/>
+                <filter name="filter_rejected"
+                        string="Rejected"
+                        domain="[('state', '=', 'rejected')]"/>
+                <separator/>
+                <filter name="filter_high_risk"
+                        string="High Risk"
+                        domain="[('risk_level', '=', 'high')]"/>
+                <filter name="filter_critical_risk"
+                        string="Critical Risk"
+                        domain="[('risk_level', '=', 'critical')]"/>
+                <separator/>
+                <filter name="filter_expiring_soon"
+                        string="Expiring Soon (14 days)"
+                        domain="[('days_until_expiry', '&gt;', 0), ('days_until_expiry', '&lt;=', 14)]"/>
+                <filter name="filter_expired"
+                        string="Expired"
+                        domain="[('is_expired', '=', True)]"/>
+
+                <!-- Group By -->
+                <group expand="0" string="Group By">
+                    <filter name="groupby_state"
+                            string="Status"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="groupby_risk_level"
+                            string="Risk Level"
+                            context="{'group_by': 'risk_level'}"/>
+                    <filter name="groupby_owner"
+                            string="Owner"
+                            context="{'group_by': 'owner_id'}"/>
+                    <filter name="groupby_reviewer"
+                            string="Reviewer"
+                            context="{'group_by': 'reviewer_id'}"/>
+                    <filter name="groupby_expiration"
+                            string="Expiration Date"
+                            context="{'group_by': 'expiration_date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ================================================================== -->
+    <!-- WINDOW ACTIONS                                                      -->
+    <!-- ================================================================== -->
+
+    <!-- All Exceptions -->
+    <record id="action_security_exception" model="ir.actions.act_window">
+        <field name="name">Security Exceptions</field>
+        <field name="res_model">security.exception</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_security_exception_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first security exception
+            </p>
+            <p>
+                Track and manage temporary security exceptions through their
+                complete lifecycle: creation, review, approval, monitoring,
+                verification, and closure.
+            </p>
+        </field>
+    </record>
+
+    <!-- My Exceptions -->
+    <record id="action_security_exception_my" model="ir.actions.act_window">
+        <field name="name">My Exceptions</field>
+        <field name="res_model">security.exception</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_security_exception_search"/>
+        <field name="context">{'search_default_filter_my_exceptions': 1}</field>
+    </record>
+
+    <!-- To Review -->
+    <record id="action_security_exception_to_review" model="ir.actions.act_window">
+        <field name="name">To Review</field>
+        <field name="res_model">security.exception</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_security_exception_search"/>
+        <field name="context">{'search_default_filter_to_review': 1}</field>
+    </record>
+
+</odoo>

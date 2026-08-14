@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================== -->
+    <!-- MODULE CATEGORY                                                     -->
+    <!-- ================================================================== -->
+    <record id="module_category_exceptrack" model="ir.module.category">
+        <field name="name">ExcepTrack</field>
+        <field name="description">Security Exception Lifecycle Management</field>
+        <field name="sequence">90</field>
+    </record>
+
+    <!-- ================================================================== -->
+    <!-- SECURITY GROUPS                                                     -->
+    <!-- ================================================================== -->
+
+    <!-- User: Create and manage own exceptions -->
+    <record id="group_exceptrack_user" model="res.groups">
+        <field name="name">User</field>
+        <field name="category_id" ref="module_category_exceptrack"/>
+        <field name="comment">Create and manage own security exception requests.</field>
+    </record>
+
+    <!-- Reviewer: Review and verify exceptions (implies User) -->
+    <record id="group_exceptrack_reviewer" model="res.groups">
+        <field name="name">Reviewer</field>
+        <field name="category_id" ref="module_category_exceptrack"/>
+        <field name="implied_ids" eval="[(4, ref('group_exceptrack_user'))]"/>
+        <field name="comment">Review, verify, and assess security exceptions.</field>
+    </record>
+
+    <!-- Manager: Approve/reject exceptions (implies Reviewer) -->
+    <record id="group_exceptrack_manager" model="res.groups">
+        <field name="name">Manager</field>
+        <field name="category_id" ref="module_category_exceptrack"/>
+        <field name="implied_ids" eval="[(4, ref('group_exceptrack_reviewer'))]"/>
+        <field name="comment">Approve or reject security exceptions.</field>
+    </record>
+
+    <!-- Administrator: Full configuration access (implies Manager) -->
+    <record id="group_exceptrack_admin" model="res.groups">
+        <field name="name">Administrator</field>
+        <field name="category_id" ref="module_category_exceptrack"/>
+        <field name="implied_ids" eval="[(4, ref('group_exceptrack_manager'))]"/>
+        <field name="comment">Full administrative access to ExcepTrack configuration.</field>
+    </record>
+
+</odoo>
