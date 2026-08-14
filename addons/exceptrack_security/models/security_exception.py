@@ -45,8 +45,37 @@ class SecurityException(models.Model):
     ]
 
     # -------------------------------------------------------------------------
-    # HELPER DEFAULTS
+    # HELPER METHODS — Robust Group User Lookup across Odoo versions
     # -------------------------------------------------------------------------
+    def _get_group_users(self, xml_id):
+        """Safely fetch all users belonging to a security group across any Odoo ORM version."""
+        group = self.env.ref(xml_id, raise_if_not_found=False)
+        if not group:
+            return self.env['res.users']
+        
+        # 1. Try group.user_ids (standard Odoo ORM Many2many)
+        try:
+            if hasattr(group, 'user_ids') and group.user_ids:
+                return group.user_ids
+        except Exception:
+            pass
+
+        # 2. Try group.users
+        try:
+            if hasattr(group, 'users') and group.users:
+                return group.users
+        except Exception:
+            pass
+
+        # 3. Try searching res.users with field introspection
+        User = self.env['res.users']
+        if 'groups_id' in User._fields:
+            return User.search([('groups_id', 'in', [group.id])])
+        if 'group_ids' in User._fields:
+            return User.search([('group_ids', 'in', [group.id])])
+        
+        return User
+
     def _default_start_date(self):
         return date.today()
 
@@ -362,36 +391,34 @@ class SecurityException(models.Model):
         return super().unlink()
 
     # -------------------------------------------------------------------------
-    # WORKFLOW ACTIONS (Strict Role, SoD & Auto-Assignment Enforcements)
+    # WORKFLOW ACTIONS (Strict Role, SoD & Multi-Reviewer Auto-Assignment)
     # -------------------------------------------------------------------------
     def action_submit(self):
-        """Draft → Assessment (Auto-assigns Security Reviewers & notifies them)"""
+        """Draft → Assessment (Auto-assigns Security Reviewer & notifies all Reviewers)"""
         self.ensure_one()
         if not self.business_justification:
             raise UserError(
                 _("Please enter a Business Justification before submitting for assessment.")
             )
 
+        reviewers = self._get_group_users('exceptrack_security.group_exceptrack_reviewer')
+
         # Auto-assign Reviewer if not already assigned
-        if not self.reviewer_id:
-            reviewer_group = self.env.ref('exceptrack_security.group_exceptrack_reviewer', raise_if_not_found=False)
-            if reviewer_group:
-                reviewers = self.env['res.users'].search([('groups_id', 'in', [reviewer_group.id])])
-                if reviewers:
-                    other_reviewers = reviewers.filtered(lambda u: u != self.env.user)
-                    self.reviewer_id = other_reviewers[0] if other_reviewers else reviewers[0]
+        if not self.reviewer_id and reviewers:
+            other_reviewers = reviewers.filtered(lambda u: u != self.env.user)
+            self.reviewer_id = other_reviewers[0] if other_reviewers else reviewers[0]
 
         self.write({'state': 'assessment'})
 
-        # Post activity notification to the assigned Security Reviewer
-        if self.reviewer_id:
+        # Post activity notifications to all active Security Reviewers
+        for reviewer in reviewers:
             self.activity_schedule(
                 'mail.mail_activity_data_todo',
                 summary=_("New Security Exception Pending Assessment"),
                 note=_(
                     "Security exception '%s' (%s) submitted by %s requires security assessment."
                 ) % (self.name, self.reference, self.env.user.name),
-                user_id=self.reviewer_id.id,
+                user_id=reviewer.id,
             )
 
     def action_assess(self):
@@ -419,14 +446,12 @@ class SecurityException(models.Model):
                 _("Access Denied: Only a Security Reviewer or Administrator can recommend approval.")
             )
 
+        managers = self._get_group_users('exceptrack_security.group_exceptrack_manager')
+
         # Auto-assign Approving Manager if not set
-        if not self.approver_id:
-            manager_group = self.env.ref('exceptrack_security.group_exceptrack_manager', raise_if_not_found=False)
-            if manager_group:
-                managers = self.env['res.users'].search([('groups_id', 'in', [manager_group.id])])
-                if managers:
-                    other_managers = managers.filtered(lambda u: u != self.env.user and u != self.requester_id)
-                    self.approver_id = other_managers[0] if other_managers else managers[0]
+        if not self.approver_id and managers:
+            other_managers = managers.filtered(lambda u: u != self.env.user and u != self.requester_id)
+            self.approver_id = other_managers[0] if other_managers else managers[0]
 
         if not self.approver_id:
             raise UserError(
