@@ -57,7 +57,7 @@
     </record>
 
     <!-- ================================================================== -->
-    <!-- FORM VIEW (Strict Role & Separation of Duties UI)                  -->
+    <!-- FORM VIEW (Strict Field Locks & Tamper Prevention)                 -->
     <!-- ================================================================== -->
     <record id="view_security_exception_form" model="ir.ui.view">
         <field name="name">security.exception.form</field>
@@ -65,7 +65,7 @@
         <field name="arch" type="xml">
             <form string="Security Exception">
                 <header>
-                    <!-- Workflow Buttons with Strict Role Group Restrictions -->
+                    <!-- Workflow Action Buttons -->
                     <button name="action_submit"
                             string="▶ Submit for Assessment"
                             type="object"
@@ -159,7 +159,7 @@
                         <span class="badge bg-primary fs-6 mb-1">Security Exception Record</span>
                         <h1>
                             <field name="name" placeholder="Enter Exception Title (e.g. Legacy TLS 1.0 Authentication Server)..."
-                                   readonly="state in ('closed', 'rejected')"/>
+                                   readonly="state != 'draft'"/>
                         </h1>
                         <h3>
                             <span class="text-muted">Reference ID: </span>
@@ -167,22 +167,22 @@
                         </h3>
                     </div>
 
-                    <!-- Section 1: Assignees & Responsibilities (Strict Field Locks) -->
+                    <!-- Section 1: Assignees & Responsibilities -->
                     <group>
                         <group string="👤 Assignees &amp; Responsibilities">
                             <field name="requester_id" string="Requested By (Submitter)" readonly="1"/>
-                            <field name="owner_id" string="Risk Owner (Accountable)" readonly="state in ('closed', 'rejected')"/>
-                            <field name="reviewer_id" string="Security Reviewer" readonly="state in ('draft', 'active', 'closed', 'rejected')"/>
-                            <field name="approver_id" string="Approving Manager" readonly="state in ('draft', 'active', 'closed', 'rejected')"/>
+                            <field name="owner_id" string="Risk Owner (Accountable)" readonly="state != 'draft'"/>
+                            <field name="reviewer_id" string="Security Reviewer" readonly="state not in ('assessment', 'review')"/>
+                            <field name="approver_id" string="Approving Manager" readonly="state not in ('review', 'pending_approval')"/>
                         </group>
 
                         <group string="⚡ Risk Ranking &amp; Deadlines">
-                            <field name="risk_level" string="Risk Severity" widget="radio" options="{'horizontal': true}" readonly="state in ('active', 'closed', 'rejected')"/>
-                            <field name="likelihood" string="Exploit Likelihood" widget="radio" options="{'horizontal': true}" readonly="state in ('active', 'closed', 'rejected')"/>
+                            <field name="risk_level" string="Risk Severity" widget="radio" options="{'horizontal': true}" readonly="state != 'draft'"/>
+                            <field name="likelihood" string="Exploit Likelihood" widget="radio" options="{'horizontal': true}" readonly="state != 'draft'"/>
                             <separator string="Target Deadlines"/>
-                            <field name="start_date" string="Effective Start Date" readonly="state in ('active', 'closed', 'rejected')"/>
+                            <field name="start_date" string="Effective Start Date" readonly="state != 'draft'"/>
                             <field name="review_date" string="Scheduled Review Date"/>
-                            <field name="expiration_date" string="Expiration Deadline" readonly="state in ('active', 'closed', 'rejected')"/>
+                            <field name="expiration_date" string="Expiration Deadline" readonly="state != 'draft'"/>
                             <field name="days_until_expiry" string="Days Remaining" readonly="1"/>
                             <field name="is_expired" invisible="1"/>
                             <field name="renewal_count" string="Renewal Count" invisible="renewal_count == 0"/>
@@ -194,22 +194,22 @@
                         <field name="business_justification"
                                string="Business Justification"
                                placeholder="Why is this security exception necessary? (e.g. Vendor delay, critical business dependence)..."
-                               readonly="state in ('closed', 'rejected')"/>
+                               readonly="state != 'draft'"/>
                         <field name="technical_justification"
                                string="Technical Justification"
                                placeholder="What technical obstacles prevent fixing this issue immediately?..."
-                               readonly="state in ('closed', 'rejected')"/>
+                               readonly="state != 'draft'"/>
                         <field name="description"
                                string="Full Summary"
                                placeholder="Detailed technical summary of the affected system, architecture, or vulnerability..."
-                               readonly="state in ('closed', 'rejected')"/>
+                               readonly="state != 'draft'"/>
                     </group>
 
                     <!-- Notebook Tabs for Controls, Verification, and Audit Log -->
                     <notebook>
                         <!-- Tab 1: Compensating Controls -->
                         <page string="🛡 Compensating Risk Controls" name="controls">
-                            <field name="control_ids" readonly="state in ('closed', 'rejected')">
+                            <field name="control_ids" readonly="state not in ('draft', 'assessment', 'review')">
                                 <list editable="bottom">
                                     <field name="sequence" widget="handle" string=" "/>
                                     <field name="name" string="Control Name"/>
@@ -224,8 +224,8 @@
                         <!-- Tab 2: Detailed Impact Assessment -->
                         <page string="📊 Risk Impact Assessment" name="impact_assessment">
                             <group>
-                                <field name="impact" string="Business Impact" placeholder="What is the potential impact if this risk is exploited?" readonly="state in ('closed', 'rejected')"/>
-                                <field name="risk_description" string="Technical Risk Details" placeholder="CVSS scores, CVE IDs, or technical vectors..." readonly="state in ('closed', 'rejected')"/>
+                                <field name="impact" string="Business Impact" placeholder="What is the potential impact if this risk is exploited?" readonly="state != 'draft'"/>
+                                <field name="risk_description" string="Technical Risk Details" placeholder="CVSS scores, CVE IDs, or technical vectors..." readonly="state != 'draft'"/>
                             </group>
                         </page>
 

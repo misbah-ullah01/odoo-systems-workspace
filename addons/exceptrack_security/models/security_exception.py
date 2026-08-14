@@ -306,7 +306,7 @@ class SecurityException(models.Model):
                     )
 
     # -------------------------------------------------------------------------
-    # CRUD OVERRIDES
+    # CRUD OVERRIDES (Strict Security & Tamper Protection)
     # -------------------------------------------------------------------------
     @api.model_create_multi
     def create(self, vals_list):
@@ -319,17 +319,83 @@ class SecurityException(models.Model):
             vals['requester_id'] = self.env.user.id
         return super().create(vals_list)
 
+    def write(self, vals):
+        """Strict Security Control: Block regular users from modifying submitted records."""
+        is_reviewer_or_above = (
+            self.env.user.has_group('exceptrack_security.group_exceptrack_reviewer') or
+            self.env.user.has_group('exceptrack_security.group_exceptrack_manager') or
+            self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
+        )
+        is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
+
+        for record in self:
+            # 1. Block regular users (Alice) from modifying any record once submitted (state != 'draft')
+            if record.state != 'draft' and not is_reviewer_or_above:
+                # If only updating chatter (message_follower_ids, etc.), allow
+                user_updated_fields = set(vals.keys()) - {'message_follower_ids', 'activity_ids', 'message_ids'}
+                if user_updated_fields:
+                    raise UserError(_(
+                        "Access Denied: Security exception '%s' has been submitted for assessment and cannot be modified by a regular user. "
+                        "Please contact a Security Reviewer or Manager to request changes."
+                    ) % record.name)
+
+            # 2. Block regular users from modifying Reviewer or Approver assignments at ANY stage
+            if ('reviewer_id' in vals or 'approver_id' in vals) and not is_reviewer_or_above:
+                raise UserError(_(
+                    "Access Denied: Only a Security Reviewer, Manager, or Administrator can assign or change Reviewers and Approvers."
+                ))
+
+        return super().write(vals)
+
+    def unlink(self):
+        """Strict Security Audit Protection: Block deletion of non-draft records."""
+        is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
+        for record in self:
+            if record.state != 'draft' and not is_admin:
+                raise UserError(_(
+                    "Audit Compliance Violation: Security exception '%s' (%s) has passed the Draft stage and cannot be deleted. "
+                    "Submitted exceptions must remain in the system for security audit history."
+                ) % (record.name, record.reference))
+            if record.state == 'draft' and record.requester_id != self.env.user and not is_admin:
+                raise UserError(_(
+                    "Access Denied: You can only delete Draft requests that you submitted yourself."
+                ))
+        return super().unlink()
+
     # -------------------------------------------------------------------------
-    # WORKFLOW ACTIONS (Strict Role & Separation of Duties Enforcements)
+    # WORKFLOW ACTIONS (Strict Role, SoD & Auto-Assignment Enforcements)
     # -------------------------------------------------------------------------
     def action_submit(self):
-        """Draft → Assessment"""
+        """Draft → Assessment (Auto-assigns Security Reviewers & notifies them)"""
         self.ensure_one()
         if not self.business_justification:
             raise UserError(
                 _("Please enter a Business Justification before submitting for assessment.")
             )
+
+        # Auto-assign Reviewer if not already assigned
+        if not self.reviewer_id:
+            reviewer_group = self.env.ref('exceptrack_security.group_exceptrack_reviewer', raise_if_not_found=False)
+            if reviewer_group and reviewer_group.users:
+                # Assign a reviewer who is NOT the requester if available
+                other_reviewers = reviewer_group.users.filtered(lambda u: u != self.env.user)
+                if other_reviewers:
+                    self.reviewer_id = other_reviewers[0]
+                else:
+                    self.reviewer_id = reviewer_group.users[0]
+
         self.write({'state': 'assessment'})
+
+        # Post activity notification to the assigned Security Reviewer
+        if self.reviewer_id:
+            self.activity_schedule(
+                'mail.mail_activity_data_todo',
+                summary=_("New Security Exception Pending Assessment"),
+                note=_(
+                    "Security exception '%s' (%s) submitted by %s requires security assessment."
+                ) % (self.name, self.reference, self.env.user.name),
+                user_id=self.reviewer_id.id,
+            )
 
     def action_assess(self):
         """Assessment → Review"""
@@ -347,7 +413,7 @@ class SecurityException(models.Model):
         self.write({'state': 'review'})
 
     def action_recommend_approval(self):
-        """Review → Pending Approval"""
+        """Review → Pending Approval (Auto-assigns Approving Manager if needed)"""
         self.ensure_one()
         is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
         is_reviewer = self.env.user.has_group('exceptrack_security.group_exceptrack_reviewer')
@@ -355,11 +421,33 @@ class SecurityException(models.Model):
             raise UserError(
                 _("Access Denied: Only a Security Reviewer or Administrator can recommend approval.")
             )
+        
+        # Auto-assign Approving Manager if not set
+        if not self.approver_id:
+            manager_group = self.env.ref('exceptrack_security.group_exceptrack_manager', raise_if_not_found=False)
+            if manager_group and manager_group.users:
+                other_managers = manager_group.users.filtered(lambda u: u != self.env.user and u != self.requester_id)
+                if other_managers:
+                    self.approver_id = other_managers[0]
+                else:
+                    self.approver_id = manager_group.users[0]
+
         if not self.approver_id:
             raise UserError(
                 _("Please assign an Approving Manager before recommending approval.")
             )
         self.write({'state': 'pending_approval'})
+
+        # Post activity notification to Approving Manager
+        if self.approver_id:
+            self.activity_schedule(
+                'mail.mail_activity_data_todo',
+                summary=_("Security Exception Pending Approval"),
+                note=_(
+                    "Security exception '%s' (%s) recommended for approval by %s. Please review and approve/reject."
+                ) % (self.name, self.reference, self.env.user.name),
+                user_id=self.approver_id.id,
+            )
 
     def action_approve(self):
         """Pending Approval → Active (Separation of Duties Enforced)"""
@@ -403,7 +491,7 @@ class SecurityException(models.Model):
         self.write({'state': 'rejected'})
 
     def action_revise(self):
-        """Rejected → Draft"""
+        """Rejected → Draft (Allows Requester to edit & resubmit)"""
         self.ensure_one()
         if self.state != 'rejected':
             raise UserError(
