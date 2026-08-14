@@ -91,8 +91,9 @@ class SecurityException(models.Model):
         string='Requested By',
         default=lambda self: self.env.user,
         required=True,
+        readonly=True,
         tracking=True,
-        help="The person submitting this exception request.",
+        help="The person submitting this exception request (automatically assigned).",
     )
     owner_id = fields.Many2one(
         'res.users',
@@ -248,13 +249,13 @@ class SecurityException(models.Model):
     def _compute_color(self):
         for record in self:
             if record.risk_level == 'critical':
-                record.color = 1  # Red
+                record.color = 1
             elif record.risk_level == 'high':
-                record.color = 2  # Orange
+                record.color = 2
             elif record.risk_level == 'medium':
-                record.color = 3  # Yellow
+                record.color = 3
             else:
-                record.color = 4  # Green
+                record.color = 4
 
     @api.depends('expiration_date')
     def _compute_days_until_expiry(self):
@@ -314,10 +315,12 @@ class SecurityException(models.Model):
                 vals['reference'] = self.env['ir.sequence'].next_by_code(
                     'security.exception.sequence'
                 ) or _('New')
+            # Force requester_id to the logged-in user for audit integrity
+            vals['requester_id'] = self.env.user.id
         return super().create(vals_list)
 
     # -------------------------------------------------------------------------
-    # WORKFLOW ACTIONS (Clear user feedback)
+    # WORKFLOW ACTIONS (Strict Role & Separation of Duties Enforcements)
     # -------------------------------------------------------------------------
     def action_submit(self):
         """Draft → Assessment"""
@@ -331,6 +334,12 @@ class SecurityException(models.Model):
     def action_assess(self):
         """Assessment → Review"""
         self.ensure_one()
+        is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
+        is_reviewer = self.env.user.has_group('exceptrack_security.group_exceptrack_reviewer')
+        if not (is_reviewer or is_admin):
+            raise UserError(
+                _("Access Denied: Only a Security Reviewer or Administrator can complete security assessment.")
+            )
         if not self.reviewer_id:
             raise UserError(
                 _("Please assign a Security Reviewer before completing assessment.")
@@ -340,6 +349,12 @@ class SecurityException(models.Model):
     def action_recommend_approval(self):
         """Review → Pending Approval"""
         self.ensure_one()
+        is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
+        is_reviewer = self.env.user.has_group('exceptrack_security.group_exceptrack_reviewer')
+        if not (is_reviewer or is_admin):
+            raise UserError(
+                _("Access Denied: Only a Security Reviewer or Administrator can recommend approval.")
+            )
         if not self.approver_id:
             raise UserError(
                 _("Please assign an Approving Manager before recommending approval.")
@@ -347,8 +362,23 @@ class SecurityException(models.Model):
         self.write({'state': 'pending_approval'})
 
     def action_approve(self):
-        """Pending Approval → Active"""
+        """Pending Approval → Active (Separation of Duties Enforced)"""
         self.ensure_one()
+        is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
+        is_manager = self.env.user.has_group('exceptrack_security.group_exceptrack_manager')
+
+        # 1. Role Check
+        if not (is_manager or is_admin):
+            raise UserError(
+                _("Access Denied: Only an Approving Manager or Administrator can approve security exceptions.")
+            )
+
+        # 2. Separation of Duties Check: Submitter cannot self-approve unless Admin
+        if self.requester_id == self.env.user and not is_admin:
+            raise UserError(
+                _("Separation of Duties Violation: You submitted this exception request yourself. An independent Manager must review and approve it.")
+            )
+
         if not self.start_date or not self.expiration_date:
             raise UserError(
                 _("Both Start Date and Expiration Deadline are required before activation.")
@@ -358,6 +388,14 @@ class SecurityException(models.Model):
     def action_reject(self):
         """Review / Pending Approval → Rejected"""
         self.ensure_one()
+        is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
+        is_reviewer = self.env.user.has_group('exceptrack_security.group_exceptrack_reviewer')
+        is_manager = self.env.user.has_group('exceptrack_security.group_exceptrack_manager')
+
+        if not (is_reviewer or is_manager or is_admin):
+            raise UserError(
+                _("Access Denied: Only a Security Reviewer, Manager, or Administrator can reject requests.")
+            )
         if self.state not in ('review', 'pending_approval'):
             raise UserError(
                 _("Rejection is only allowed during Review or Pending Approval stages.")
@@ -376,11 +414,24 @@ class SecurityException(models.Model):
     def action_initiate_review(self):
         """Active → Under Review"""
         self.ensure_one()
+        is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
+        is_reviewer = self.env.user.has_group('exceptrack_security.group_exceptrack_reviewer')
+        is_manager = self.env.user.has_group('exceptrack_security.group_exceptrack_manager')
+        if not (is_reviewer or is_manager or is_admin):
+            raise UserError(
+                _("Access Denied: Only a Security Reviewer, Manager, or Administrator can initiate periodic review.")
+            )
         self.write({'state': 'under_review'})
 
     def action_renew(self):
         """Under Review → Active (Renewal)"""
         self.ensure_one()
+        is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
+        is_manager = self.env.user.has_group('exceptrack_security.group_exceptrack_manager')
+        if not (is_manager or is_admin):
+            raise UserError(
+                _("Access Denied: Only an Approving Manager or Administrator can grant exception renewals.")
+            )
         if self.state != 'under_review':
             raise UserError(
                 _("Only exceptions under review can be renewed.")
@@ -398,6 +449,12 @@ class SecurityException(models.Model):
     def action_request_verification(self):
         """Under Review → Pending Verification"""
         self.ensure_one()
+        is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
+        is_reviewer = self.env.user.has_group('exceptrack_security.group_exceptrack_reviewer')
+        if not (is_reviewer or is_admin):
+            raise UserError(
+                _("Access Denied: Only a Security Reviewer or Administrator can request remediation verification.")
+            )
         if self.state != 'under_review':
             raise UserError(
                 _("Verification can only be requested for exceptions under review.")
@@ -413,6 +470,16 @@ class SecurityException(models.Model):
     def action_verify_pass(self):
         """Pending Verification → Closed (Pass)"""
         self.ensure_one()
+        is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
+        is_reviewer = self.env.user.has_group('exceptrack_security.group_exceptrack_reviewer')
+        if not (is_reviewer or is_admin):
+            raise UserError(
+                _("Access Denied: Only a Security Reviewer or Administrator can perform remediation verification.")
+            )
+        if self.requester_id == self.env.user and not is_admin:
+            raise UserError(
+                _("Separation of Duties Violation: You cannot verify the remediation of an exception that you requested yourself!")
+            )
         if self.state != 'pending_verification':
             raise UserError(
                 _("Verification is only possible when pending verification.")
@@ -431,6 +498,12 @@ class SecurityException(models.Model):
     def action_verify_fail(self):
         """Pending Verification → Active (Fail)"""
         self.ensure_one()
+        is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
+        is_reviewer = self.env.user.has_group('exceptrack_security.group_exceptrack_reviewer')
+        if not (is_reviewer or is_admin):
+            raise UserError(
+                _("Access Denied: Only a Security Reviewer or Administrator can perform remediation verification.")
+            )
         if self.state != 'pending_verification':
             raise UserError(
                 _("Verification is only possible when pending verification.")

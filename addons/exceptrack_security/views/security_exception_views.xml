@@ -57,7 +57,7 @@
     </record>
 
     <!-- ================================================================== -->
-    <!-- FORM VIEW (Full-Width Spacious Form Layout — No Squishing)        -->
+    <!-- FORM VIEW (Strict Role & Separation of Duties UI)                  -->
     <!-- ================================================================== -->
     <record id="view_security_exception_form" model="ir.ui.view">
         <field name="name">security.exception.form</field>
@@ -65,57 +65,76 @@
         <field name="arch" type="xml">
             <form string="Security Exception">
                 <header>
-                    <!-- Workflow Action Buttons -->
+                    <!-- Workflow Buttons with Strict Role Group Restrictions -->
                     <button name="action_submit"
                             string="▶ Submit for Assessment"
                             type="object"
                             class="oe_highlight"
                             invisible="state != 'draft'"/>
+
                     <button name="action_assess"
                             string="🔍 Complete Review Assignment"
                             type="object"
                             class="oe_highlight"
+                            groups="exceptrack_security.group_exceptrack_reviewer"
                             invisible="state != 'assessment'"/>
+
                     <button name="action_recommend_approval"
                             string="📋 Recommend Approval"
                             type="object"
                             class="oe_highlight"
+                            groups="exceptrack_security.group_exceptrack_reviewer"
                             invisible="state != 'review'"/>
+
                     <button name="action_reject"
                             string="❌ Reject Request"
                             type="object"
                             class="btn-secondary"
+                            groups="exceptrack_security.group_exceptrack_reviewer"
                             invisible="state not in ('review', 'pending_approval')"/>
+
                     <button name="action_approve"
                             string="👍 Approve Exception"
                             type="object"
                             class="oe_highlight"
+                            groups="exceptrack_security.group_exceptrack_manager"
                             invisible="state != 'pending_approval'"/>
+
                     <button name="action_initiate_review"
                             string="🔄 Initiate Periodic Review"
                             type="object"
                             class="oe_highlight"
+                            groups="exceptrack_security.group_exceptrack_reviewer"
                             invisible="state != 'active'"/>
+
                     <button name="action_renew"
                             string="Extend Renewal"
                             type="object"
                             class="oe_highlight"
+                            groups="exceptrack_security.group_exceptrack_manager"
                             invisible="state != 'under_review'"/>
+
                     <button name="action_request_verification"
                             string="Request Verification"
                             type="object"
                             class="btn-secondary"
+                            groups="exceptrack_security.group_exceptrack_reviewer"
                             invisible="state != 'under_review'"/>
+
                     <button name="action_verify_pass"
                             string="✅ Verify &amp; Pass (Close)"
                             type="object"
                             class="oe_highlight"
+                            groups="exceptrack_security.group_exceptrack_reviewer"
                             invisible="state != 'pending_verification'"/>
+
                     <button name="action_verify_fail"
                             string="❌ Verify &amp; Fail"
                             type="object"
                             class="btn-danger"
+                            groups="exceptrack_security.group_exceptrack_reviewer"
                             invisible="state != 'pending_verification'"/>
+
                     <button name="action_revise"
                             string="✏ Revise Draft"
                             type="object"
@@ -148,22 +167,22 @@
                         </h3>
                     </div>
 
-                    <!-- Section 1: Assignees & Timeline (Full Width 2-Column Grid) -->
+                    <!-- Section 1: Assignees & Responsibilities (Strict Field Locks) -->
                     <group>
                         <group string="👤 Assignees &amp; Responsibilities">
-                            <field name="requester_id" string="Requested By (Submitter)"/>
-                            <field name="owner_id" string="Risk Owner (Accountable)"/>
-                            <field name="reviewer_id" string="Security Reviewer"/>
-                            <field name="approver_id" string="Approving Manager"/>
+                            <field name="requester_id" string="Requested By (Submitter)" readonly="1"/>
+                            <field name="owner_id" string="Risk Owner (Accountable)" readonly="state in ('closed', 'rejected')"/>
+                            <field name="reviewer_id" string="Security Reviewer" readonly="state in ('draft', 'active', 'closed', 'rejected')"/>
+                            <field name="approver_id" string="Approving Manager" readonly="state in ('draft', 'active', 'closed', 'rejected')"/>
                         </group>
 
                         <group string="⚡ Risk Ranking &amp; Deadlines">
-                            <field name="risk_level" string="Risk Severity" widget="radio" options="{'horizontal': true}"/>
-                            <field name="likelihood" string="Exploit Likelihood" widget="radio" options="{'horizontal': true}"/>
+                            <field name="risk_level" string="Risk Severity" widget="radio" options="{'horizontal': true}" readonly="state in ('active', 'closed', 'rejected')"/>
+                            <field name="likelihood" string="Exploit Likelihood" widget="radio" options="{'horizontal': true}" readonly="state in ('active', 'closed', 'rejected')"/>
                             <separator string="Target Deadlines"/>
-                            <field name="start_date" string="Effective Start Date"/>
+                            <field name="start_date" string="Effective Start Date" readonly="state in ('active', 'closed', 'rejected')"/>
                             <field name="review_date" string="Scheduled Review Date"/>
-                            <field name="expiration_date" string="Expiration Deadline"/>
+                            <field name="expiration_date" string="Expiration Deadline" readonly="state in ('active', 'closed', 'rejected')"/>
                             <field name="days_until_expiry" string="Days Remaining" readonly="1"/>
                             <field name="is_expired" invisible="1"/>
                             <field name="renewal_count" string="Renewal Count" invisible="renewal_count == 0"/>
@@ -174,20 +193,23 @@
                     <group string="📝 Details &amp; Business Justification">
                         <field name="business_justification"
                                string="Business Justification"
-                               placeholder="Why is this security exception necessary? (e.g. Vendor delay, critical business dependence)..."/>
+                               placeholder="Why is this security exception necessary? (e.g. Vendor delay, critical business dependence)..."
+                               readonly="state in ('closed', 'rejected')"/>
                         <field name="technical_justification"
                                string="Technical Justification"
-                               placeholder="What technical obstacles prevent fixing this issue immediately?..."/>
+                               placeholder="What technical obstacles prevent fixing this issue immediately?..."
+                               readonly="state in ('closed', 'rejected')"/>
                         <field name="description"
                                string="Full Summary"
-                               placeholder="Detailed technical summary of the affected system, architecture, or vulnerability..."/>
+                               placeholder="Detailed technical summary of the affected system, architecture, or vulnerability..."
+                               readonly="state in ('closed', 'rejected')"/>
                     </group>
 
                     <!-- Notebook Tabs for Controls, Verification, and Audit Log -->
                     <notebook>
                         <!-- Tab 1: Compensating Controls -->
                         <page string="🛡 Compensating Risk Controls" name="controls">
-                            <field name="control_ids">
+                            <field name="control_ids" readonly="state in ('closed', 'rejected')">
                                 <list editable="bottom">
                                     <field name="sequence" widget="handle" string=" "/>
                                     <field name="name" string="Control Name"/>
@@ -202,8 +224,8 @@
                         <!-- Tab 2: Detailed Impact Assessment -->
                         <page string="📊 Risk Impact Assessment" name="impact_assessment">
                             <group>
-                                <field name="impact" string="Business Impact" placeholder="What is the potential impact if this risk is exploited?"/>
-                                <field name="risk_description" string="Technical Risk Details" placeholder="CVSS scores, CVE IDs, or technical vectors..."/>
+                                <field name="impact" string="Business Impact" placeholder="What is the potential impact if this risk is exploited?" readonly="state in ('closed', 'rejected')"/>
+                                <field name="risk_description" string="Technical Risk Details" placeholder="CVSS scores, CVE IDs, or technical vectors..." readonly="state in ('closed', 'rejected')"/>
                             </group>
                         </page>
 
@@ -212,19 +234,20 @@
                               invisible="state not in ('pending_verification', 'closed')">
                             <group>
                                 <group string="Verification Outcome">
-                                    <field name="verification_result" string="Outcome"/>
-                                    <field name="verified_by_id" string="Verified By"/>
-                                    <field name="verification_date" string="Verification Date"/>
+                                    <field name="verification_result" string="Outcome" readonly="1"/>
+                                    <field name="verified_by_id" string="Verified By" readonly="1"/>
+                                    <field name="verification_date" string="Verification Date" readonly="1"/>
                                 </group>
                                 <group string="Audit Findings">
                                     <field name="verification_notes"
                                            string="Verification Findings"
-                                           placeholder="Record vulnerability scan results or security audit evidence..."/>
+                                           placeholder="Record vulnerability scan results or security audit evidence..."
+                                           readonly="state == 'closed'"/>
                                 </group>
                             </group>
                         </page>
 
-                        <!-- Tab 4: Audit Activity & Chatter Log (Clean full-width tab inside form) -->
+                        <!-- Tab 4: Audit Activity & Chatter Log -->
                         <page string="💬 Activity &amp; Audit Log" name="chatter_tab">
                             <div class="p-2">
                                 <field name="message_follower_ids" widget="many2many_tags"/>
