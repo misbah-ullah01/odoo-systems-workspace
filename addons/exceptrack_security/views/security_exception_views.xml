@@ -147,7 +147,7 @@
                             </group>
                         </page>
 
-                        <!-- Compensating Controls Tab (Odoo 19: <list> replaces <tree>) -->
+                        <!-- Compensating Controls Tab -->
                         <page string="Compensating Controls" name="controls">
                             <field name="control_ids">
                                 <list editable="bottom">
@@ -186,7 +186,7 @@
     </record>
 
     <!-- ================================================================== -->
-    <!-- LIST VIEW (Odoo 19: <list> replaces <tree>)                         -->
+    <!-- LIST VIEW                                                           -->
     <!-- ================================================================== -->
     <record id="view_security_exception_list" model="ir.ui.view">
         <field name="name">security.exception.list</field>
@@ -216,13 +216,13 @@
     </record>
 
     <!-- ================================================================== -->
-    <!-- SEARCH VIEW                                                         -->
+    <!-- SEARCH VIEW (Odoo 19: clean <search> tag without string attribute)  -->
     <!-- ================================================================== -->
     <record id="view_security_exception_search" model="ir.ui.view">
         <field name="name">security.exception.search</field>
         <field name="model">security.exception</field>
         <field name="arch" type="xml">
-            <search string="Search Security Exceptions">
+            <search>
                 <field name="name"/>
                 <field name="reference"/>
                 <field name="owner_id"/>
@@ -235,7 +235,7 @@
                         domain="['|', ('requester_id', '=', uid), ('owner_id', '=', uid)]"/>
                 <filter name="filter_to_review"
                         string="To Review"
-                        domain="[('reviewer_id', '=', uid), ('state', 'in', ['review', 'pending_verification'])]"/>
+                        domain="[('reviewer_id', '=', uid), ('state', 'in', ('review', 'pending_verification'))]"/>
                 <separator/>
                 <filter name="filter_draft"
                         string="Draft"
@@ -264,7 +264,7 @@
                         domain="[('risk_level', '=', 'critical')]"/>
                 <separator/>
                 <filter name="filter_expiring_soon"
-                        string="Expiring Soon (14 days)"
+                        string="Expiring Soon"
                         domain="[('days_until_expiry', '&gt;', 0), ('days_until_expiry', '&lt;=', 14)]"/>
                 <filter name="filter_expired"
                         string="Expired"
@@ -286,14 +286,14 @@
                             context="{'group_by': 'reviewer_id'}"/>
                     <filter name="groupby_expiration"
                             string="Expiration Date"
-                            context="{'group_by': 'expiration_date:month'}"/>
+                            context="{'group_by': 'expiration_date'}"/>
                 </group>
             </search>
         </field>
     </record>
 
     <!-- ================================================================== -->
-    <!-- WINDOW ACTIONS (Odoo 19: view_mode is 'list,form' instead of 'tree,form') -->
+    <!-- WINDOW ACTIONS                                                      -->
     <!-- ================================================================== -->
 
     <!-- All Exceptions -->
