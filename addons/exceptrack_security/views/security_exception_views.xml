@@ -233,21 +233,30 @@
                             </group>
                         </page>
 
-                        <!-- Tab 3: Remediation Verification -->
-                        <page string="🔍 Remediation Verification" name="verification"
-                              invisible="state not in ('pending_verification', 'closed')">
+                        <!-- Tab 3: Remediation Verification & Rejection Audit -->
+                        <page string="🔍 Verification &amp; Rejection Audit" name="verification">
                             <group>
-                                <group string="Verification Outcome">
+                                <group string="Verification Outcome" invisible="state == 'rejected'">
                                     <field name="verification_result" string="Outcome" readonly="state == 'closed'"/>
                                     <field name="verified_by_id" string="Verified By" readonly="1"/>
                                     <field name="verification_date" string="Verification Date" readonly="1"/>
                                 </group>
-                                <group string="Audit Findings">
-                                    <field name="verification_notes"
-                                           string="Verification Findings"
-                                           placeholder="Record vulnerability scan results or security audit evidence..."
-                                           readonly="state == 'closed'"/>
+                                <group string="Rejection Audit Details" invisible="state != 'rejected'">
+                                    <field name="rejected_by_id" string="Rejected By" readonly="1"/>
+                                    <field name="rejection_date" string="Rejection Date" readonly="1"/>
                                 </group>
+                            </group>
+                            <group string="Verification &amp; Rejection Findings">
+                                <field name="verification_notes"
+                                       string="Verification Findings"
+                                       placeholder="Record vulnerability scan results, penetration test findings, or audit evidence..."
+                                       readonly="state == 'closed'"
+                                       invisible="state == 'rejected'"/>
+                                <field name="rejection_reason"
+                                       string="Rejection Findings / Reason"
+                                       placeholder="Record the security reason why this exception request was rejected..."
+                                       readonly="state == 'closed'"
+                                       invisible="state != 'rejected'"/>
                             </group>
                         </page>
                     </notebook>
@@ -345,7 +354,7 @@
     </record>
 
     <!-- ================================================================== -->
-    <!-- WINDOW ACTIONS (Role-Specific Uncluttered Dashboards)               -->
+    <!-- WINDOW ACTIONS                                                      -->
     <!-- ================================================================== -->
 
     <!-- All Exceptions (Overview / Admins) -->
@@ -384,7 +393,7 @@
         <field name="context">{'search_default_filter_my_assigned_reviews': 1}</field>
     </record>
 
-    <!-- My Pending Approvals (Managers — Uncluttered Dashboard) -->
+    <!-- My Pending Approvals (Managers) -->
     <record id="action_security_exception_to_approve" model="ir.actions.act_window">
         <field name="name">My Pending Approvals</field>
         <field name="res_model">security.exception</field>

@@ -220,7 +220,7 @@ class SecurityException(models.Model):
     )
 
     # -------------------------------------------------------------------------
-    # FIELDS — Compensating Controls & Verification
+    # FIELDS — Compensating Controls, Verification & Rejection Details
     # -------------------------------------------------------------------------
     control_ids = fields.One2many(
         'security.exception.control',
@@ -244,7 +244,21 @@ class SecurityException(models.Model):
     )
     verification_notes = fields.Text(
         string='Verification Findings',
-        help="Detailed notes confirming remediation has been verified.",
+        help="Detailed notes confirming remediation has been verified or vulnerability scan evidence.",
+    )
+    rejection_reason = fields.Text(
+        string='Rejection Reason / Findings',
+        tracking=True,
+        help="Detailed explanation recorded when an exception is rejected.",
+    )
+    rejected_by_id = fields.Many2one(
+        'res.users',
+        string='Rejected By',
+        tracking=True,
+    )
+    rejection_date = fields.Date(
+        string='Rejection Date',
+        tracking=True,
     )
 
     # -------------------------------------------------------------------------
@@ -405,7 +419,7 @@ class SecurityException(models.Model):
         return super().unlink()
 
     # -------------------------------------------------------------------------
-    # WORKFLOW ACTIONS (Strict Assigned Reviewer / Approver Lockouts)
+    # WORKFLOW ACTIONS (Strict Assigned Reviewer / Approver Lockouts & Audit)
     # -------------------------------------------------------------------------
     def action_submit(self):
         """Draft → Assessment (Guaranteed Modulo 50/50 Round-Robin Reviewer Alternation)"""
@@ -452,7 +466,6 @@ class SecurityException(models.Model):
                 _("Access Denied: Only a Security Reviewer or Administrator can complete security assessment.")
             )
         
-        # Enforce Assigned Reviewer Lockout
         if self.reviewer_id and self.env.user.id != self.reviewer_id.id and not is_admin:
             raise UserError(_(
                 "Access Denied: Security exception '%s' is assigned to Reviewer %s. "
@@ -526,14 +539,14 @@ class SecurityException(models.Model):
                 _("Access Denied: Only an Approving Manager or Administrator can approve security exceptions.")
             )
 
-        # 2. Assigned Manager Lockout Check (Manager B cannot approve Manager A's ticket)
+        # 2. Assigned Manager Lockout Check
         if self.approver_id and self.env.user.id != self.approver_id.id and not is_admin:
             raise UserError(_(
                 "Access Denied: Security exception '%s' is assigned to Approving Manager %s. "
                 "Only the assigned Manager (%s) or a Security Administrator can approve this request."
             ) % (self.name, self.approver_id.name, self.approver_id.name))
 
-        # 3. Separation of Duties Check: Submitter cannot self-approve unless Admin
+        # 3. Separation of Duties Check
         if self.requester_id.id == self.env.user.id and not is_admin:
             raise UserError(
                 _("Separation of Duties Violation: You submitted this exception request yourself. An independent Manager must review and approve it.")
@@ -546,7 +559,7 @@ class SecurityException(models.Model):
         self.sudo().with_context(sudo_workflow=True).write({'state': 'active'})
 
     def action_reject(self):
-        """Review / Pending Approval → Rejected (Assigned User Lockout Enforced)"""
+        """Review / Pending Approval → Rejected (Records Rejection Audit Info)"""
         self.ensure_one()
         is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
         is_reviewer = self.env.user.has_group('exceptrack_security.group_exceptrack_reviewer')
@@ -571,7 +584,12 @@ class SecurityException(models.Model):
             raise UserError(
                 _("Rejection is only allowed during Review or Pending Approval stages.")
             )
-        self.sudo().with_context(sudo_workflow=True).write({'state': 'rejected'})
+
+        self.sudo().with_context(sudo_workflow=True).write({
+            'state': 'rejected',
+            'rejected_by_id': self.env.user.id,
+            'rejection_date': date.today(),
+        })
 
     def action_revise(self):
         """Rejected → Draft (Allows Requester to edit & resubmit)"""
