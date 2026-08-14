@@ -53,21 +53,18 @@ class SecurityException(models.Model):
         if not group:
             return self.env['res.users']
         
-        # 1. Try group.user_ids (standard Odoo ORM Many2many)
         try:
             if hasattr(group, 'user_ids') and group.user_ids:
                 return group.user_ids
         except Exception:
             pass
 
-        # 2. Try group.users
         try:
             if hasattr(group, 'users') and group.users:
                 return group.users
         except Exception:
             pass
 
-        # 3. Try searching res.users with field introspection
         User = self.env['res.users']
         if 'groups_id' in User._fields:
             return User.search([('groups_id', 'in', [group.id])])
@@ -353,13 +350,14 @@ class SecurityException(models.Model):
         is_reviewer_or_above = (
             self.env.user.has_group('exceptrack_security.group_exceptrack_reviewer') or
             self.env.user.has_group('exceptrack_security.group_exceptrack_manager') or
-            self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
+            self.env.user.has_group('exceptrack_security.group_exceptrack_admin') or
+            self.env.is_superuser() or
+            self.env.context.get('sudo_workflow')
         )
 
         for record in self:
             # 1. Block regular users (Alice) from modifying any record once submitted (state != 'draft')
             if record.state != 'draft' and not is_reviewer_or_above:
-                # Allow chatter updates (tracking, activities, messages)
                 user_updated_fields = set(vals.keys()) - {'message_follower_ids', 'activity_ids', 'message_ids'}
                 if user_updated_fields:
                     raise UserError(_(
@@ -367,7 +365,7 @@ class SecurityException(models.Model):
                         "Please contact a Security Reviewer or Manager to request changes."
                     ) % record.name)
 
-            # 2. Block regular users from modifying Reviewer or Approver assignments at ANY stage
+            # 2. Block regular users from manually modifying Reviewer or Approver assignments at ANY stage
             if ('reviewer_id' in vals or 'approver_id' in vals) and not is_reviewer_or_above:
                 raise UserError(_(
                     "Access Denied: Only a Security Reviewer, Manager, or Administrator can assign or change Reviewers and Approvers."
@@ -404,15 +402,21 @@ class SecurityException(models.Model):
         reviewers = self._get_group_users('exceptrack_security.group_exceptrack_reviewer')
 
         # Auto-assign Reviewer if not already assigned
+        assigned_reviewer = False
         if not self.reviewer_id and reviewers:
             other_reviewers = reviewers.filtered(lambda u: u != self.env.user)
-            self.reviewer_id = other_reviewers[0] if other_reviewers else reviewers[0]
+            assigned_reviewer = other_reviewers[0] if other_reviewers else reviewers[0]
 
-        self.write({'state': 'assessment'})
+        vals = {'state': 'assessment'}
+        if assigned_reviewer:
+            vals['reviewer_id'] = assigned_reviewer.id
+
+        # Use sudo with context flag to allow system workflow auto-assignment
+        self.sudo().with_context(sudo_workflow=True).write(vals)
 
         # Post activity notifications to all active Security Reviewers
         for reviewer in reviewers:
-            self.activity_schedule(
+            self.sudo().activity_schedule(
                 'mail.mail_activity_data_todo',
                 summary=_("New Security Exception Pending Assessment"),
                 note=_(
@@ -434,7 +438,7 @@ class SecurityException(models.Model):
             raise UserError(
                 _("Please assign a Security Reviewer before completing assessment.")
             )
-        self.write({'state': 'review'})
+        self.sudo().with_context(sudo_workflow=True).write({'state': 'review'})
 
     def action_recommend_approval(self):
         """Review → Pending Approval (Auto-assigns Approving Manager if needed)"""
@@ -449,25 +453,32 @@ class SecurityException(models.Model):
         managers = self._get_group_users('exceptrack_security.group_exceptrack_manager')
 
         # Auto-assign Approving Manager if not set
+        assigned_approver = False
         if not self.approver_id and managers:
             other_managers = managers.filtered(lambda u: u != self.env.user and u != self.requester_id)
-            self.approver_id = other_managers[0] if other_managers else managers[0]
+            assigned_approver = other_managers[0] if other_managers else managers[0]
 
-        if not self.approver_id:
+        vals = {'state': 'pending_approval'}
+        if assigned_approver:
+            vals['approver_id'] = assigned_approver.id
+
+        self.sudo().with_context(sudo_workflow=True).write(vals)
+
+        target_approver = self.approver_id or assigned_approver
+        if not target_approver:
             raise UserError(
                 _("Please assign an Approving Manager before recommending approval.")
             )
-        self.write({'state': 'pending_approval'})
 
         # Post activity notification to Approving Manager
-        if self.approver_id:
-            self.activity_schedule(
+        if target_approver:
+            self.sudo().activity_schedule(
                 'mail.mail_activity_data_todo',
                 summary=_("Security Exception Pending Approval"),
                 note=_(
                     "Security exception '%s' (%s) recommended for approval by %s. Please review and approve/reject."
                 ) % (self.name, self.reference, self.env.user.name),
-                user_id=self.approver_id.id,
+                user_id=target_approver.id,
             )
 
     def action_approve(self):
@@ -492,7 +503,7 @@ class SecurityException(models.Model):
             raise UserError(
                 _("Both Start Date and Expiration Deadline are required before activation.")
             )
-        self.write({'state': 'active'})
+        self.sudo().with_context(sudo_workflow=True).write({'state': 'active'})
 
     def action_reject(self):
         """Review / Pending Approval → Rejected"""
@@ -509,7 +520,7 @@ class SecurityException(models.Model):
             raise UserError(
                 _("Rejection is only allowed during Review or Pending Approval stages.")
             )
-        self.write({'state': 'rejected'})
+        self.sudo().with_context(sudo_workflow=True).write({'state': 'rejected'})
 
     def action_revise(self):
         """Rejected → Draft (Allows Requester to edit & resubmit)"""
@@ -518,7 +529,7 @@ class SecurityException(models.Model):
             raise UserError(
                 _("Only rejected exceptions can be revised.")
             )
-        self.write({'state': 'draft'})
+        self.sudo().with_context(sudo_workflow=True).write({'state': 'draft'})
 
     def action_initiate_review(self):
         """Active → Under Review"""
@@ -530,7 +541,7 @@ class SecurityException(models.Model):
             raise UserError(
                 _("Access Denied: Only a Security Reviewer, Manager, or Administrator can initiate periodic review.")
             )
-        self.write({'state': 'under_review'})
+        self.sudo().with_context(sudo_workflow=True).write({'state': 'under_review'})
 
     def action_renew(self):
         """Under Review → Active (Renewal)"""
@@ -545,7 +556,7 @@ class SecurityException(models.Model):
             raise UserError(
                 _("Only exceptions under review can be renewed.")
             )
-        self.write({
+        self.sudo().with_context(sudo_workflow=True).write({
             'state': 'active',
             'renewal_count': self.renewal_count + 1,
         })
@@ -568,7 +579,7 @@ class SecurityException(models.Model):
             raise UserError(
                 _("Verification can only be requested for exceptions under review.")
             )
-        self.write({
+        self.sudo().with_context(sudo_workflow=True).write({
             'state': 'pending_verification',
             'verification_result': False,
             'verified_by_id': False,
@@ -597,7 +608,7 @@ class SecurityException(models.Model):
             raise UserError(
                 _("Please record your Verification Findings in the Verification tab before closing.")
             )
-        self.write({
+        self.sudo().with_context(sudo_workflow=True).write({
             'state': 'closed',
             'verification_result': 'pass',
             'verified_by_id': self.env.user.id,
@@ -621,7 +632,7 @@ class SecurityException(models.Model):
             raise UserError(
                 _("Please record your Verification Findings in the Verification tab.")
             )
-        self.write({
+        self.sudo().with_context(sudo_workflow=True).write({
             'state': 'active',
             'verification_result': 'fail',
             'verified_by_id': self.env.user.id,
