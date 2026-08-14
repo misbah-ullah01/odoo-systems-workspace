@@ -11,20 +11,29 @@
     </record>
 
     <!-- ================================================================== -->
+    <!-- PRIVILEGE (Odoo 19: replaces direct category_id on res.groups)      -->
+    <!-- ================================================================== -->
+    <record id="privilege_exceptrack" model="res.groups.privilege">
+        <field name="name">ExcepTrack Access</field>
+        <field name="category_id" ref="module_category_exceptrack"/>
+        <field name="sequence">10</field>
+    </record>
+
+    <!-- ================================================================== -->
     <!-- SECURITY GROUPS                                                     -->
     <!-- ================================================================== -->
 
     <!-- User: Create and manage own exceptions -->
     <record id="group_exceptrack_user" model="res.groups">
         <field name="name">User</field>
-        <field name="category_id" ref="module_category_exceptrack"/>
+        <field name="privilege_id" ref="privilege_exceptrack"/>
         <field name="comment">Create and manage own security exception requests.</field>
     </record>
 
     <!-- Reviewer: Review and verify exceptions (implies User) -->
     <record id="group_exceptrack_reviewer" model="res.groups">
         <field name="name">Reviewer</field>
-        <field name="category_id" ref="module_category_exceptrack"/>
+        <field name="privilege_id" ref="privilege_exceptrack"/>
         <field name="implied_ids" eval="[(4, ref('group_exceptrack_user'))]"/>
         <field name="comment">Review, verify, and assess security exceptions.</field>
     </record>
@@ -32,7 +41,7 @@
     <!-- Manager: Approve/reject exceptions (implies Reviewer) -->
     <record id="group_exceptrack_manager" model="res.groups">
         <field name="name">Manager</field>
-        <field name="category_id" ref="module_category_exceptrack"/>
+        <field name="privilege_id" ref="privilege_exceptrack"/>
         <field name="implied_ids" eval="[(4, ref('group_exceptrack_reviewer'))]"/>
         <field name="comment">Approve or reject security exceptions.</field>
     </record>
@@ -40,7 +49,7 @@
     <!-- Administrator: Full configuration access (implies Manager) -->
     <record id="group_exceptrack_admin" model="res.groups">
         <field name="name">Administrator</field>
-        <field name="category_id" ref="module_category_exceptrack"/>
+        <field name="privilege_id" ref="privilege_exceptrack"/>
         <field name="implied_ids" eval="[(4, ref('group_exceptrack_manager'))]"/>
         <field name="comment">Full administrative access to ExcepTrack configuration.</field>
     </record>

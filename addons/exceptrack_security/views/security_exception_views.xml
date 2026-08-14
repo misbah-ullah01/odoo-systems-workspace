@@ -10,62 +10,62 @@
         <field name="arch" type="xml">
             <form string="Security Exception">
                 <header>
-                    <!-- Workflow Buttons -->
+                    <!-- Workflow Buttons (Odoo 19: use invisible= instead of states=) -->
                     <button name="action_submit"
                             string="Submit"
                             type="object"
                             class="oe_highlight"
-                            states="draft"/>
+                            invisible="state != 'draft'"/>
                     <button name="action_assess"
                             string="Complete Assessment"
                             type="object"
                             class="oe_highlight"
-                            states="assessment"/>
+                            invisible="state != 'assessment'"/>
                     <button name="action_recommend_approval"
                             string="Recommend Approval"
                             type="object"
                             class="oe_highlight"
-                            states="review"/>
+                            invisible="state != 'review'"/>
                     <button name="action_reject"
                             string="Reject"
                             type="object"
                             class="btn-secondary"
-                            states="review,pending_approval"/>
+                            invisible="state not in ('review', 'pending_approval')"/>
                     <button name="action_approve"
                             string="Approve"
                             type="object"
                             class="oe_highlight"
-                            states="pending_approval"/>
+                            invisible="state != 'pending_approval'"/>
                     <button name="action_initiate_review"
                             string="Initiate Review"
                             type="object"
                             class="oe_highlight"
-                            states="active"/>
+                            invisible="state != 'active'"/>
                     <button name="action_renew"
                             string="Renew"
                             type="object"
                             class="oe_highlight"
-                            states="under_review"/>
+                            invisible="state != 'under_review'"/>
                     <button name="action_request_verification"
                             string="Request Verification"
                             type="object"
                             class="btn-secondary"
-                            states="under_review"/>
+                            invisible="state != 'under_review'"/>
                     <button name="action_verify_pass"
                             string="Verify — Pass"
                             type="object"
                             class="oe_highlight"
-                            states="pending_verification"/>
+                            invisible="state != 'pending_verification'"/>
                     <button name="action_verify_fail"
                             string="Verify — Fail"
                             type="object"
                             class="btn-danger"
-                            states="pending_verification"/>
+                            invisible="state != 'pending_verification'"/>
                     <button name="action_revise"
                             string="Revise"
                             type="object"
                             class="btn-secondary"
-                            states="rejected"/>
+                            invisible="state != 'rejected'"/>
 
                     <!-- Status Bar -->
                     <field name="state"
@@ -76,7 +76,7 @@
                 <sheet>
                     <!-- Alert Banners -->
                     <div class="alert alert-warning" role="alert"
-                         attrs="{'invisible': [('is_expired', '=', False)]}">
+                         invisible="not is_expired">
                         <strong>⚠ This exception has expired!</strong>
                         Please initiate a review to renew or close this exception.
                     </div>
@@ -87,7 +87,7 @@
                         </h1>
                         <h2>
                             <field name="name" placeholder="Exception Title..."
-                                   attrs="{'readonly': [('state', 'in', ['closed', 'rejected'])]}"/>
+                                   readonly="state in ('closed', 'rejected')"/>
                         </h2>
                     </div>
 
@@ -106,7 +106,7 @@
                             <field name="days_until_expiry"/>
                             <field name="is_expired" invisible="1"/>
                             <field name="renewal_count"
-                                   attrs="{'invisible': [('renewal_count', '=', 0)]}"/>
+                                   invisible="renewal_count == 0"/>
                         </group>
                     </group>
 
@@ -163,7 +163,7 @@
 
                         <!-- Verification Tab -->
                         <page string="Verification" name="verification"
-                              attrs="{'invisible': [('state', 'not in', ['pending_verification', 'closed'])]}">
+                              invisible="state not in ('pending_verification', 'closed')">
                             <group>
                                 <group>
                                     <field name="verification_result"/>
