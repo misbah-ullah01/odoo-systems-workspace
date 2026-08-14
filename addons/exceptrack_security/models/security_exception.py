@@ -45,7 +45,7 @@ class SecurityException(models.Model):
     ]
 
     # -------------------------------------------------------------------------
-    # HELPER METHODS — Robust Group User Lookup across Odoo versions
+    # HELPER METHODS — Robust Group User Lookup & Dynamic Domains
     # -------------------------------------------------------------------------
     def _get_group_users(self, xml_id):
         """Safely fetch all users belonging to a security group across any Odoo ORM version."""
@@ -110,7 +110,7 @@ class SecurityException(models.Model):
     )
 
     # -------------------------------------------------------------------------
-    # FIELDS — Ownership & Assignments
+    # FIELDS — Ownership & Assignments (Filtered Dropdowns)
     # -------------------------------------------------------------------------
     requester_id = fields.Many2one(
         'res.users',
@@ -132,14 +132,16 @@ class SecurityException(models.Model):
     reviewer_id = fields.Many2one(
         'res.users',
         string='Security Reviewer',
+        domain="[('share', '=', False)]",
         tracking=True,
-        help="The security engineer assigned to evaluate this request.",
+        help="The security engineer assigned to evaluate this request (Filtered to Reviewers only).",
     )
     approver_id = fields.Many2one(
         'res.users',
         string='Approving Manager',
+        domain="[('share', '=', False)]",
         tracking=True,
-        help="The manager authorized to officially approve or reject this exception.",
+        help="The manager authorized to officially approve or reject this exception (Filtered to Managers only).",
     )
 
     # -------------------------------------------------------------------------
@@ -332,7 +334,7 @@ class SecurityException(models.Model):
                     )
 
     # -------------------------------------------------------------------------
-    # CRUD OVERRIDES (Strict Security & Tamper Protection)
+    # CRUD OVERRIDES (Selective Stage-by-Stage Security Enforcements)
     # -------------------------------------------------------------------------
     @api.model_create_multi
     def create(self, vals_list):
@@ -346,7 +348,7 @@ class SecurityException(models.Model):
         return super().create(vals_list)
 
     def write(self, vals):
-        """Strict Security Control: Block regular users from modifying submitted records."""
+        """Selective Security Control: Block regular users from modifying submitted records while allowing Reviewers/Managers to evaluate."""
         is_reviewer_or_above = (
             self.env.user.has_group('exceptrack_security.group_exceptrack_reviewer') or
             self.env.user.has_group('exceptrack_security.group_exceptrack_manager') or
@@ -356,7 +358,7 @@ class SecurityException(models.Model):
         )
 
         for record in self:
-            # 1. Block regular users (Alice) from modifying any record once submitted (state != 'draft')
+            # 1. Block regular users (Alice) from modifying records once submitted (state != 'draft')
             if record.state != 'draft' and not is_reviewer_or_above:
                 user_updated_fields = set(vals.keys()) - {'message_follower_ids', 'activity_ids', 'message_ids'}
                 if user_updated_fields:
@@ -389,10 +391,10 @@ class SecurityException(models.Model):
         return super().unlink()
 
     # -------------------------------------------------------------------------
-    # WORKFLOW ACTIONS (Least-Loaded Workload Balancing for Reviewers)
+    # WORKFLOW ACTIONS (True 50/50 Round-Robin Reviewer Alternation)
     # -------------------------------------------------------------------------
     def action_submit(self):
-        """Draft → Assessment (Load-balances reviewer assignment among all Reviewers)"""
+        """Draft → Assessment (True 50/50 Round-Robin Auto-Assignment among Reviewers)"""
         self.ensure_one()
         if not self.business_justification:
             raise UserError(
@@ -401,20 +403,23 @@ class SecurityException(models.Model):
 
         reviewers = self._get_group_users('exceptrack_security.group_exceptrack_reviewer')
 
-        # Auto-assign Reviewer with the FEWEST open tickets (Least Loaded Load Balancer)
+        # Auto-assign Reviewer using True 50/50 Round-Robin alternation if not manually selected
         assigned_reviewer = False
         if not self.reviewer_id and reviewers:
             candidate_reviewers = reviewers.filtered(lambda u: u != self.env.user) or reviewers
-            workloads = []
-            for rev in candidate_reviewers:
-                count = self.env['security.exception'].search_count([
-                    ('reviewer_id', '=', rev.id),
-                    ('state', 'in', ['assessment', 'review', 'under_review', 'pending_verification'])
-                ])
-                workloads.append((count, rev.id, rev))
-            # Sort by workload ascending (least loaded first)
-            workloads.sort(key=lambda x: (x[0], x[1]))
-            assigned_reviewer = workloads[0][2]
+            if len(candidate_reviewers) == 1:
+                assigned_reviewer = candidate_reviewers[0]
+            else:
+                # Find the last submitted exception with an assigned reviewer to rotate to the next one
+                last_exc = self.search([
+                    ('reviewer_id', 'in', candidate_reviewers.ids)
+                ], order='id desc', limit=1)
+                if last_exc and last_exc.reviewer_id in candidate_reviewers:
+                    last_idx = candidate_reviewers.ids.index(last_exc.reviewer_id.id)
+                    next_idx = (last_idx + 1) % len(candidate_reviewers)
+                    assigned_reviewer = candidate_reviewers[next_idx]
+                else:
+                    assigned_reviewer = candidate_reviewers[0]
 
         vals = {'state': 'assessment'}
         if assigned_reviewer:
@@ -449,7 +454,7 @@ class SecurityException(models.Model):
         self.sudo().with_context(sudo_workflow=True).write({'state': 'review'})
 
     def action_recommend_approval(self):
-        """Review → Pending Approval (Load-balances manager assignment)"""
+        """Review → Pending Approval (Round-Robin Manager Auto-Assignment)"""
         self.ensure_one()
         is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
         is_reviewer = self.env.user.has_group('exceptrack_security.group_exceptrack_reviewer')
@@ -460,19 +465,22 @@ class SecurityException(models.Model):
 
         managers = self._get_group_users('exceptrack_security.group_exceptrack_manager')
 
-        # Auto-assign Manager with fewest pending approvals
+        # Auto-assign Manager using Round-Robin if not manually selected
         assigned_approver = False
         if not self.approver_id and managers:
             candidate_managers = managers.filtered(lambda u: u != self.env.user and u != self.requester_id) or managers
-            workloads = []
-            for mgr in candidate_managers:
-                count = self.env['security.exception'].search_count([
-                    ('approver_id', '=', mgr.id),
-                    ('state', '=', 'pending_approval')
-                ])
-                workloads.append((count, mgr.id, mgr))
-            workloads.sort(key=lambda x: (x[0], x[1]))
-            assigned_approver = workloads[0][2]
+            if len(candidate_managers) == 1:
+                assigned_approver = candidate_managers[0]
+            else:
+                last_exc = self.search([
+                    ('approver_id', 'in', candidate_managers.ids)
+                ], order='id desc', limit=1)
+                if last_exc and last_exc.approver_id in candidate_managers:
+                    last_idx = candidate_managers.ids.index(last_exc.approver_id.id)
+                    next_idx = (last_idx + 1) % len(candidate_managers)
+                    assigned_approver = candidate_managers[next_idx]
+                else:
+                    assigned_approver = candidate_managers[0]
 
         vals = {'state': 'pending_approval'}
         if assigned_approver:

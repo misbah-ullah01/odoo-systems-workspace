@@ -57,7 +57,7 @@
     </record>
 
     <!-- ================================================================== -->
-    <!-- FORM VIEW (Strict Field Locks & Tamper Prevention)                 -->
+    <!-- FORM VIEW (Selective Stage Editability & Native Chatter)           -->
     <!-- ================================================================== -->
     <record id="view_security_exception_form" model="ir.ui.view">
         <field name="name">security.exception.form</field>
@@ -167,22 +167,26 @@
                         </h3>
                     </div>
 
-                    <!-- Section 1: Assignees & Responsibilities -->
+                    <!-- Section 1: Assignees & Responsibilities (Filtered Dropdowns) -->
                     <group>
                         <group string="👤 Assignees &amp; Responsibilities">
                             <field name="requester_id" string="Requested By (Submitter)" readonly="1"/>
                             <field name="owner_id" string="Risk Owner (Accountable)" readonly="state != 'draft'"/>
-                            <field name="reviewer_id" string="Security Reviewer" readonly="state not in ('assessment', 'review')"/>
-                            <field name="approver_id" string="Approving Manager" readonly="state not in ('review', 'pending_approval')"/>
+                            <field name="reviewer_id" string="Security Reviewer"
+                                   domain="[('groups_id', 'in', [ref('exceptrack_security.group_exceptrack_reviewer')]), ('share', '=', False)]"
+                                   readonly="state not in ('draft', 'assessment', 'review')"/>
+                            <field name="approver_id" string="Approving Manager"
+                                   domain="[('groups_id', 'in', [ref('exceptrack_security.group_exceptrack_manager')]), ('share', '=', False)]"
+                                   readonly="state not in ('draft', 'review', 'pending_approval')"/>
                         </group>
 
                         <group string="⚡ Risk Ranking &amp; Deadlines">
-                            <field name="risk_level" string="Risk Severity" widget="radio" options="{'horizontal': true}" readonly="state != 'draft'"/>
-                            <field name="likelihood" string="Exploit Likelihood" widget="radio" options="{'horizontal': true}" readonly="state != 'draft'"/>
+                            <field name="risk_level" string="Risk Severity" widget="radio" options="{'horizontal': true}" readonly="state not in ('draft', 'assessment', 'review')"/>
+                            <field name="likelihood" string="Exploit Likelihood" widget="radio" options="{'horizontal': true}" readonly="state not in ('draft', 'assessment', 'review')"/>
                             <separator string="Target Deadlines"/>
-                            <field name="start_date" string="Effective Start Date" readonly="state != 'draft'"/>
-                            <field name="review_date" string="Scheduled Review Date"/>
-                            <field name="expiration_date" string="Expiration Deadline" readonly="state != 'draft'"/>
+                            <field name="start_date" string="Effective Start Date" readonly="state in ('active', 'closed', 'rejected')"/>
+                            <field name="review_date" string="Scheduled Review Date" readonly="state in ('closed', 'rejected')"/>
+                            <field name="expiration_date" string="Expiration Deadline" readonly="state in ('closed', 'rejected')"/>
                             <field name="days_until_expiry" string="Days Remaining" readonly="1"/>
                             <field name="is_expired" invisible="1"/>
                             <field name="renewal_count" string="Renewal Count" invisible="renewal_count == 0"/>
@@ -209,7 +213,7 @@
                     <notebook>
                         <!-- Tab 1: Compensating Controls -->
                         <page string="🛡 Compensating Risk Controls" name="controls">
-                            <field name="control_ids" readonly="state not in ('draft', 'assessment', 'review')">
+                            <field name="control_ids" readonly="state in ('closed', 'rejected')">
                                 <list editable="bottom">
                                     <field name="sequence" widget="handle" string=" "/>
                                     <field name="name" string="Control Name"/>
@@ -224,8 +228,8 @@
                         <!-- Tab 2: Detailed Impact Assessment -->
                         <page string="📊 Risk Impact Assessment" name="impact_assessment">
                             <group>
-                                <field name="impact" string="Business Impact" placeholder="What is the potential impact if this risk is exploited?" readonly="state != 'draft'"/>
-                                <field name="risk_description" string="Technical Risk Details" placeholder="CVSS scores, CVE IDs, or technical vectors..." readonly="state != 'draft'"/>
+                                <field name="impact" string="Business Impact" placeholder="What is the potential impact if this risk is exploited?" readonly="state in ('closed', 'rejected')"/>
+                                <field name="risk_description" string="Technical Risk Details" placeholder="CVSS scores, CVE IDs, or technical vectors..." readonly="state in ('closed', 'rejected')"/>
                             </group>
                         </page>
 
@@ -234,7 +238,7 @@
                               invisible="state not in ('pending_verification', 'closed')">
                             <group>
                                 <group string="Verification Outcome">
-                                    <field name="verification_result" string="Outcome" readonly="1"/>
+                                    <field name="verification_result" string="Outcome" readonly="state == 'closed'"/>
                                     <field name="verified_by_id" string="Verified By" readonly="1"/>
                                     <field name="verification_date" string="Verification Date" readonly="1"/>
                                 </group>
@@ -246,17 +250,11 @@
                                 </group>
                             </group>
                         </page>
-
-                        <!-- Tab 4: Audit Activity & Chatter Log -->
-                        <page string="💬 Activity &amp; Audit Log" name="chatter_tab">
-                            <div class="p-2">
-                                <field name="message_follower_ids" widget="many2many_tags"/>
-                                <field name="activity_ids"/>
-                                <field name="message_ids"/>
-                            </div>
-                        </page>
                     </notebook>
                 </sheet>
+
+                <!-- Native Odoo Chatter Audit Trail (Follower badges, Log Note, Send Message, Activities) -->
+                <chatter/>
             </form>
         </field>
     </record>
