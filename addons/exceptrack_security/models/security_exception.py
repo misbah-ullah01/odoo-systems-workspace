@@ -389,10 +389,10 @@ class SecurityException(models.Model):
         return super().unlink()
 
     # -------------------------------------------------------------------------
-    # WORKFLOW ACTIONS (Strict Role, SoD & Multi-Reviewer Auto-Assignment)
+    # WORKFLOW ACTIONS (Least-Loaded Workload Balancing for Reviewers)
     # -------------------------------------------------------------------------
     def action_submit(self):
-        """Draft → Assessment (Auto-assigns Security Reviewer & notifies all Reviewers)"""
+        """Draft → Assessment (Load-balances reviewer assignment among all Reviewers)"""
         self.ensure_one()
         if not self.business_justification:
             raise UserError(
@@ -401,17 +401,25 @@ class SecurityException(models.Model):
 
         reviewers = self._get_group_users('exceptrack_security.group_exceptrack_reviewer')
 
-        # Auto-assign Reviewer if not already assigned
+        # Auto-assign Reviewer with the FEWEST open tickets (Least Loaded Load Balancer)
         assigned_reviewer = False
         if not self.reviewer_id and reviewers:
-            other_reviewers = reviewers.filtered(lambda u: u != self.env.user)
-            assigned_reviewer = other_reviewers[0] if other_reviewers else reviewers[0]
+            candidate_reviewers = reviewers.filtered(lambda u: u != self.env.user) or reviewers
+            workloads = []
+            for rev in candidate_reviewers:
+                count = self.env['security.exception'].search_count([
+                    ('reviewer_id', '=', rev.id),
+                    ('state', 'in', ['assessment', 'review', 'under_review', 'pending_verification'])
+                ])
+                workloads.append((count, rev.id, rev))
+            # Sort by workload ascending (least loaded first)
+            workloads.sort(key=lambda x: (x[0], x[1]))
+            assigned_reviewer = workloads[0][2]
 
         vals = {'state': 'assessment'}
         if assigned_reviewer:
             vals['reviewer_id'] = assigned_reviewer.id
 
-        # Use sudo with context flag to allow system workflow auto-assignment
         self.sudo().with_context(sudo_workflow=True).write(vals)
 
         # Post activity notifications to all active Security Reviewers
@@ -441,7 +449,7 @@ class SecurityException(models.Model):
         self.sudo().with_context(sudo_workflow=True).write({'state': 'review'})
 
     def action_recommend_approval(self):
-        """Review → Pending Approval (Auto-assigns Approving Manager if needed)"""
+        """Review → Pending Approval (Load-balances manager assignment)"""
         self.ensure_one()
         is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
         is_reviewer = self.env.user.has_group('exceptrack_security.group_exceptrack_reviewer')
@@ -452,11 +460,19 @@ class SecurityException(models.Model):
 
         managers = self._get_group_users('exceptrack_security.group_exceptrack_manager')
 
-        # Auto-assign Approving Manager if not set
+        # Auto-assign Manager with fewest pending approvals
         assigned_approver = False
         if not self.approver_id and managers:
-            other_managers = managers.filtered(lambda u: u != self.env.user and u != self.requester_id)
-            assigned_approver = other_managers[0] if other_managers else managers[0]
+            candidate_managers = managers.filtered(lambda u: u != self.env.user and u != self.requester_id) or managers
+            workloads = []
+            for mgr in candidate_managers:
+                count = self.env['security.exception'].search_count([
+                    ('approver_id', '=', mgr.id),
+                    ('state', '=', 'pending_approval')
+                ])
+                workloads.append((count, mgr.id, mgr))
+            workloads.sort(key=lambda x: (x[0], x[1]))
+            assigned_approver = workloads[0][2]
 
         vals = {'state': 'pending_approval'}
         if assigned_approver:
