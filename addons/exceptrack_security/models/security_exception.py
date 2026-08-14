@@ -343,16 +343,14 @@ class SecurityException(models.Model):
                 seq_number = self.env['ir.sequence'].next_by_code('security.exception.sequence')
                 if not seq_number:
                     seq_number = _('New')
-                # Guarantee unique incremental reference number without collision with demo records
                 while self.search_count([('reference', '=', seq_number)]) > 0:
                     seq_number = self.env['ir.sequence'].next_by_code('security.exception.sequence')
                 vals['reference'] = seq_number
-            # Force requester_id to the logged-in user for audit integrity
             vals['requester_id'] = self.env.user.id
         return super().create(vals_list)
 
     def write(self, vals):
-        """Selective Security Control: Block regular users from modifying submitted records."""
+        """Selective Security Control: Enforce assigned Reviewer/Manager lockouts and block regular user tampering."""
         is_reviewer_or_above = (
             self.env.user.has_group('exceptrack_security.group_exceptrack_reviewer') or
             self.env.user.has_group('exceptrack_security.group_exceptrack_manager') or
@@ -360,6 +358,7 @@ class SecurityException(models.Model):
             self.env.is_superuser() or
             self.env.context.get('sudo_workflow')
         )
+        is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin') or self.env.is_superuser()
 
         for record in self:
             # 1. Block regular users (Alice) from modifying records once submitted (state != 'draft')
@@ -376,6 +375,17 @@ class SecurityException(models.Model):
                 raise UserError(_(
                     "Access Denied: Only a Security Reviewer, Manager, or Administrator can assign or change Reviewers and Approvers."
                 ))
+
+            # 3. Block unassigned Reviewers/Managers from modifying a ticket assigned to someone else
+            if not is_admin and not self.env.context.get('sudo_workflow'):
+                if record.state in ('assessment', 'review', 'under_review', 'pending_verification') and record.reviewer_id:
+                    if self.env.user != record.reviewer_id and self.env.user != record.approver_id:
+                        user_updated_fields = set(vals.keys()) - {'message_follower_ids', 'activity_ids', 'message_ids'}
+                        if user_updated_fields:
+                            raise UserError(_(
+                                "Access Denied: Security exception '%s' is assigned to Reviewer %s. "
+                                "Only the assigned Reviewer or Administrator can modify this ticket."
+                            ) % (record.name, record.reviewer_id.name))
 
         return super().write(vals)
 
@@ -395,7 +405,7 @@ class SecurityException(models.Model):
         return super().unlink()
 
     # -------------------------------------------------------------------------
-    # WORKFLOW ACTIONS (Guaranteed Modulo 50/50 Round-Robin Reviewer Alternation)
+    # WORKFLOW ACTIONS (Strict Assigned Reviewer / Approver Lockouts)
     # -------------------------------------------------------------------------
     def action_submit(self):
         """Draft → Assessment (Guaranteed Modulo 50/50 Round-Robin Reviewer Alternation)"""
@@ -407,11 +417,9 @@ class SecurityException(models.Model):
 
         reviewers = self._get_group_users('exceptrack_security.group_exceptrack_reviewer')
 
-        # Auto-assign Reviewer using strict Modulo 50/50 Round-Robin alternation if not manually selected
         assigned_reviewer = False
         if not self.reviewer_id and reviewers:
             candidate_reviewers = reviewers.filtered(lambda u: u != self.env.user) or reviewers
-            # Sort candidate reviewers by ID for deterministic index order [Bob, Jerry]
             candidate_reviewers = candidate_reviewers.sorted(key=lambda r: r.id)
             total_submitted = self.search_count([('state', '!=', 'draft')])
             assigned_reviewer = candidate_reviewers[total_submitted % len(candidate_reviewers)]
@@ -434,14 +442,23 @@ class SecurityException(models.Model):
             )
 
     def action_assess(self):
-        """Assessment → Review"""
+        """Assessment → Review (Assigned Reviewer Lockout Enforced)"""
         self.ensure_one()
         is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
         is_reviewer = self.env.user.has_group('exceptrack_security.group_exceptrack_reviewer')
+
         if not (is_reviewer or is_admin):
             raise UserError(
                 _("Access Denied: Only a Security Reviewer or Administrator can complete security assessment.")
             )
+        
+        # Enforce Assigned Reviewer Lockout (Reviewer B cannot assess Reviewer A's ticket)
+        if self.reviewer_id and self.env.user != self.reviewer_id and not is_admin:
+            raise UserError(_(
+                "Access Denied: Security exception '%s' is assigned to Reviewer %s. "
+                "Only the assigned Reviewer or a Security Administrator can complete this review."
+            ) % (self.name, self.reviewer_id.name))
+
         if not self.reviewer_id:
             raise UserError(
                 _("Please assign a Security Reviewer before completing assessment.")
@@ -449,14 +466,21 @@ class SecurityException(models.Model):
         self.sudo().with_context(sudo_workflow=True).write({'state': 'review'})
 
     def action_recommend_approval(self):
-        """Review → Pending Approval (Modulo Round-Robin Manager Auto-Assignment)"""
+        """Review → Pending Approval (Assigned Reviewer Lockout Enforced)"""
         self.ensure_one()
         is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
         is_reviewer = self.env.user.has_group('exceptrack_security.group_exceptrack_reviewer')
+
         if not (is_reviewer or is_admin):
             raise UserError(
                 _("Access Denied: Only a Security Reviewer or Administrator can recommend approval.")
             )
+
+        if self.reviewer_id and self.env.user != self.reviewer_id and not is_admin:
+            raise UserError(_(
+                "Access Denied: Security exception '%s' is assigned to Reviewer %s. "
+                "Only the assigned Reviewer or a Security Administrator can recommend approval."
+            ) % (self.name, self.reviewer_id.name))
 
         managers = self._get_group_users('exceptrack_security.group_exceptrack_manager')
 
@@ -492,7 +516,7 @@ class SecurityException(models.Model):
             )
 
     def action_approve(self):
-        """Pending Approval → Active (Separation of Duties Enforced)"""
+        """Pending Approval → Active (Assigned Manager Lockout & SoD Enforced)"""
         self.ensure_one()
         is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
         is_manager = self.env.user.has_group('exceptrack_security.group_exceptrack_manager')
@@ -503,7 +527,14 @@ class SecurityException(models.Model):
                 _("Access Denied: Only an Approving Manager or Administrator can approve security exceptions.")
             )
 
-        # 2. Separation of Duties Check: Submitter cannot self-approve unless Admin
+        # 2. Assigned Manager Lockout Check (Manager B cannot approve Manager A's ticket)
+        if self.approver_id and self.env.user != self.approver_id and not is_admin:
+            raise UserError(_(
+                "Access Denied: Security exception '%s' is assigned to Approving Manager %s. "
+                "Only the assigned Manager or a Security Administrator can approve this request."
+            ) % (self.name, self.approver_id.name))
+
+        # 3. Separation of Duties Check: Submitter cannot self-approve unless Admin
         if self.requester_id == self.env.user and not is_admin:
             raise UserError(
                 _("Separation of Duties Violation: You submitted this exception request yourself. An independent Manager must review and approve it.")
@@ -516,7 +547,7 @@ class SecurityException(models.Model):
         self.sudo().with_context(sudo_workflow=True).write({'state': 'active'})
 
     def action_reject(self):
-        """Review / Pending Approval → Rejected"""
+        """Review / Pending Approval → Rejected (Assigned User Lockout Enforced)"""
         self.ensure_one()
         is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
         is_reviewer = self.env.user.has_group('exceptrack_security.group_exceptrack_reviewer')
@@ -526,6 +557,17 @@ class SecurityException(models.Model):
             raise UserError(
                 _("Access Denied: Only a Security Reviewer, Manager, or Administrator can reject requests.")
             )
+        
+        if self.state == 'pending_approval' and self.approver_id and self.env.user != self.approver_id and not is_admin:
+            raise UserError(_(
+                "Access Denied: Security exception '%s' is assigned to Approving Manager %s. Only the assigned Manager can reject this request."
+            ) % (self.name, self.approver_id.name))
+
+        if self.state in ('assessment', 'review') and self.reviewer_id and self.env.user != self.reviewer_id and not is_admin:
+            raise UserError(_(
+                "Access Denied: Security exception '%s' is assigned to Reviewer %s. Only the assigned Reviewer can reject this request."
+            ) % (self.name, self.reviewer_id.name))
+
         if self.state not in ('review', 'pending_approval'):
             raise UserError(
                 _("Rejection is only allowed during Review or Pending Approval stages.")
@@ -562,6 +604,11 @@ class SecurityException(models.Model):
             raise UserError(
                 _("Access Denied: Only an Approving Manager or Administrator can grant exception renewals.")
             )
+        if self.approver_id and self.env.user != self.approver_id and not is_admin:
+            raise UserError(_(
+                "Access Denied: Security exception '%s' is assigned to Manager %s. Only the assigned Manager can grant renewals."
+            ) % (self.name, self.approver_id.name))
+
         if self.state != 'under_review':
             raise UserError(
                 _("Only exceptions under review can be renewed.")
@@ -606,6 +653,10 @@ class SecurityException(models.Model):
             raise UserError(
                 _("Access Denied: Only a Security Reviewer or Administrator can perform remediation verification.")
             )
+        if self.reviewer_id and self.env.user != self.reviewer_id and not is_admin:
+            raise UserError(_(
+                "Access Denied: Security exception '%s' is assigned to Reviewer %s. Only the assigned Reviewer can verify remediation."
+            ) % (self.name, self.reviewer_id.name))
         if self.requester_id == self.env.user and not is_admin:
             raise UserError(
                 _("Separation of Duties Violation: You cannot verify the remediation of an exception that you requested yourself!")
@@ -634,6 +685,10 @@ class SecurityException(models.Model):
             raise UserError(
                 _("Access Denied: Only a Security Reviewer or Administrator can perform remediation verification.")
             )
+        if self.reviewer_id and self.env.user != self.reviewer_id and not is_admin:
+            raise UserError(_(
+                "Access Denied: Security exception '%s' is assigned to Reviewer %s. Only the assigned Reviewer can verify remediation."
+            ) % (self.name, self.reviewer_id.name))
         if self.state != 'pending_verification':
             raise UserError(
                 _("Verification is only possible when pending verification.")

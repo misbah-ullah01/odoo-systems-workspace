@@ -17,23 +17,31 @@
               parent="menu_exceptrack_root"
               sequence="10"/>
 
-    <menuitem id="menu_exceptrack_all_exceptions"
-              name="All Exceptions"
-              parent="menu_exceptrack_exceptions"
-              action="action_security_exception"
-              sequence="10"/>
-
     <menuitem id="menu_exceptrack_my_exceptions"
               name="My Exceptions"
               parent="menu_exceptrack_exceptions"
               action="action_security_exception_my"
-              sequence="20"/>
+              sequence="10"/>
 
     <menuitem id="menu_exceptrack_to_review"
-              name="To Review"
+              name="My Assigned Reviews"
               parent="menu_exceptrack_exceptions"
               action="action_security_exception_to_review"
+              groups="exceptrack_security.group_exceptrack_reviewer"
+              sequence="20"/>
+
+    <menuitem id="menu_exceptrack_to_approve"
+              name="My Pending Approvals"
+              parent="menu_exceptrack_exceptions"
+              action="action_security_exception_to_approve"
+              groups="exceptrack_security.group_exceptrack_manager"
               sequence="30"/>
+
+    <menuitem id="menu_exceptrack_all_exceptions"
+              name="All Exceptions"
+              parent="menu_exceptrack_exceptions"
+              action="action_security_exception"
+              sequence="40"/>
 
     <!-- ================================================================== -->
     <!-- CONFIGURATION SUBMENU (Admin only)                                  -->

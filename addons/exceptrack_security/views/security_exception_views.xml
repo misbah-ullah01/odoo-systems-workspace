@@ -253,7 +253,7 @@
                     </notebook>
                 </sheet>
 
-                <!-- Native Odoo Chatter Audit Trail (Follower badges, Log Note, Send Message, Activities) -->
+                <!-- Native Odoo Chatter Audit Trail -->
                 <chatter/>
             </form>
         </field>
@@ -295,12 +295,19 @@
                 <field name="reference" string="Reference ID"/>
                 <field name="owner_id" string="Risk Owner"/>
                 <field name="reviewer_id" string="Security Reviewer"/>
+                <field name="approver_id" string="Approving Manager"/>
                 <field name="requester_id" string="Requested By"/>
 
                 <!-- Filters -->
                 <filter name="filter_my_exceptions"
-                        string="My Exceptions"
+                        string="My Submitted Exceptions"
                         domain="['|', ('requester_id', '=', uid), ('owner_id', '=', uid)]"/>
+                <filter name="filter_my_assigned_reviews"
+                        string="My Assigned Reviews"
+                        domain="[('reviewer_id', '=', uid)]"/>
+                <filter name="filter_my_pending_approvals"
+                        string="My Pending Approvals"
+                        domain="[('approver_id', '=', uid), ('state', '=', 'pending_approval')]"/>
                 <separator/>
                 <filter name="filter_draft"
                         string="Draft"
@@ -326,18 +333,24 @@
                     <filter name="groupby_owner"
                             string="Risk Owner"
                             context="{'group_by': 'owner_id'}"/>
+                    <filter name="groupby_reviewer"
+                            string="Security Reviewer"
+                            context="{'group_by': 'reviewer_id'}"/>
+                    <filter name="groupby_approver"
+                            string="Approving Manager"
+                            context="{'group_by': 'approver_id'}"/>
                 </group>
             </search>
         </field>
     </record>
 
     <!-- ================================================================== -->
-    <!-- WINDOW ACTIONS                                                      -->
+    <!-- WINDOW ACTIONS (Role-Specific Uncluttered Dashboards)               -->
     <!-- ================================================================== -->
 
-    <!-- All Exceptions -->
+    <!-- All Exceptions (Overview / Admins) -->
     <record id="action_security_exception" model="ir.actions.act_window">
-        <field name="name">Security Exceptions</field>
+        <field name="name">Security Exceptions — All Records</field>
         <field name="res_model">security.exception</field>
         <field name="view_mode">kanban,list,form</field>
         <field name="target">current</field>
@@ -353,7 +366,7 @@
         </field>
     </record>
 
-    <!-- My Exceptions -->
+    <!-- My Exceptions (Requesters / Owners) -->
     <record id="action_security_exception_my" model="ir.actions.act_window">
         <field name="name">My Exceptions</field>
         <field name="res_model">security.exception</field>
@@ -362,12 +375,22 @@
         <field name="context">{'search_default_filter_my_exceptions': 1}</field>
     </record>
 
-    <!-- To Review -->
+    <!-- My Assigned Reviews (Reviewers) -->
     <record id="action_security_exception_to_review" model="ir.actions.act_window">
-        <field name="name">To Review</field>
+        <field name="name">My Assigned Reviews</field>
         <field name="res_model">security.exception</field>
         <field name="view_mode">kanban,list,form</field>
         <field name="target">current</field>
+        <field name="context">{'search_default_filter_my_assigned_reviews': 1}</field>
+    </record>
+
+    <!-- My Pending Approvals (Managers — Uncluttered Dashboard) -->
+    <record id="action_security_exception_to_approve" model="ir.actions.act_window">
+        <field name="name">My Pending Approvals</field>
+        <field name="res_model">security.exception</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="target">current</field>
+        <field name="context">{'search_default_filter_my_pending_approvals': 1}</field>
     </record>
 
 </odoo>
