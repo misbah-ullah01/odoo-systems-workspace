@@ -334,21 +334,25 @@ class SecurityException(models.Model):
                     )
 
     # -------------------------------------------------------------------------
-    # CRUD OVERRIDES (Selective Stage-by-Stage Security Enforcements)
+    # CRUD OVERRIDES (Incremental Reference Sequence & Tamper Protection)
     # -------------------------------------------------------------------------
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
-            if vals.get('reference', _('New')) == _('New'):
-                vals['reference'] = self.env['ir.sequence'].next_by_code(
-                    'security.exception.sequence'
-                ) or _('New')
+            if vals.get('reference', _('New')) in (_('New'), False):
+                seq_number = self.env['ir.sequence'].next_by_code('security.exception.sequence')
+                if not seq_number:
+                    seq_number = _('New')
+                # Guarantee unique incremental reference number without collision with demo records
+                while self.search_count([('reference', '=', seq_number)]) > 0:
+                    seq_number = self.env['ir.sequence'].next_by_code('security.exception.sequence')
+                vals['reference'] = seq_number
             # Force requester_id to the logged-in user for audit integrity
             vals['requester_id'] = self.env.user.id
         return super().create(vals_list)
 
     def write(self, vals):
-        """Selective Security Control: Block regular users from modifying submitted records while allowing Reviewers/Managers to evaluate."""
+        """Selective Security Control: Block regular users from modifying submitted records."""
         is_reviewer_or_above = (
             self.env.user.has_group('exceptrack_security.group_exceptrack_reviewer') or
             self.env.user.has_group('exceptrack_security.group_exceptrack_manager') or
@@ -391,10 +395,10 @@ class SecurityException(models.Model):
         return super().unlink()
 
     # -------------------------------------------------------------------------
-    # WORKFLOW ACTIONS (True 50/50 Round-Robin Reviewer Alternation)
+    # WORKFLOW ACTIONS (Guaranteed Modulo 50/50 Round-Robin Reviewer Alternation)
     # -------------------------------------------------------------------------
     def action_submit(self):
-        """Draft → Assessment (True 50/50 Round-Robin Auto-Assignment among Reviewers)"""
+        """Draft → Assessment (Guaranteed Modulo 50/50 Round-Robin Reviewer Alternation)"""
         self.ensure_one()
         if not self.business_justification:
             raise UserError(
@@ -403,23 +407,14 @@ class SecurityException(models.Model):
 
         reviewers = self._get_group_users('exceptrack_security.group_exceptrack_reviewer')
 
-        # Auto-assign Reviewer using True 50/50 Round-Robin alternation if not manually selected
+        # Auto-assign Reviewer using strict Modulo 50/50 Round-Robin alternation if not manually selected
         assigned_reviewer = False
         if not self.reviewer_id and reviewers:
             candidate_reviewers = reviewers.filtered(lambda u: u != self.env.user) or reviewers
-            if len(candidate_reviewers) == 1:
-                assigned_reviewer = candidate_reviewers[0]
-            else:
-                # Find the last submitted exception with an assigned reviewer to rotate to the next one
-                last_exc = self.search([
-                    ('reviewer_id', 'in', candidate_reviewers.ids)
-                ], order='id desc', limit=1)
-                if last_exc and last_exc.reviewer_id in candidate_reviewers:
-                    last_idx = candidate_reviewers.ids.index(last_exc.reviewer_id.id)
-                    next_idx = (last_idx + 1) % len(candidate_reviewers)
-                    assigned_reviewer = candidate_reviewers[next_idx]
-                else:
-                    assigned_reviewer = candidate_reviewers[0]
+            # Sort candidate reviewers by ID for deterministic index order [Bob, Jerry]
+            candidate_reviewers = candidate_reviewers.sorted(key=lambda r: r.id)
+            total_submitted = self.search_count([('state', '!=', 'draft')])
+            assigned_reviewer = candidate_reviewers[total_submitted % len(candidate_reviewers)]
 
         vals = {'state': 'assessment'}
         if assigned_reviewer:
@@ -454,7 +449,7 @@ class SecurityException(models.Model):
         self.sudo().with_context(sudo_workflow=True).write({'state': 'review'})
 
     def action_recommend_approval(self):
-        """Review → Pending Approval (Round-Robin Manager Auto-Assignment)"""
+        """Review → Pending Approval (Modulo Round-Robin Manager Auto-Assignment)"""
         self.ensure_one()
         is_admin = self.env.user.has_group('exceptrack_security.group_exceptrack_admin')
         is_reviewer = self.env.user.has_group('exceptrack_security.group_exceptrack_reviewer')
@@ -465,22 +460,13 @@ class SecurityException(models.Model):
 
         managers = self._get_group_users('exceptrack_security.group_exceptrack_manager')
 
-        # Auto-assign Manager using Round-Robin if not manually selected
+        # Auto-assign Manager using Modulo Round-Robin if not manually selected
         assigned_approver = False
         if not self.approver_id and managers:
             candidate_managers = managers.filtered(lambda u: u != self.env.user and u != self.requester_id) or managers
-            if len(candidate_managers) == 1:
-                assigned_approver = candidate_managers[0]
-            else:
-                last_exc = self.search([
-                    ('approver_id', 'in', candidate_managers.ids)
-                ], order='id desc', limit=1)
-                if last_exc and last_exc.approver_id in candidate_managers:
-                    last_idx = candidate_managers.ids.index(last_exc.approver_id.id)
-                    next_idx = (last_idx + 1) % len(candidate_managers)
-                    assigned_approver = candidate_managers[next_idx]
-                else:
-                    assigned_approver = candidate_managers[0]
+            candidate_managers = candidate_managers.sorted(key=lambda m: m.id)
+            total_pending = self.search_count([('state', 'in', ['pending_approval', 'active', 'closed'])])
+            assigned_approver = candidate_managers[total_pending % len(candidate_managers)]
 
         vals = {'state': 'pending_approval'}
         if assigned_approver:
