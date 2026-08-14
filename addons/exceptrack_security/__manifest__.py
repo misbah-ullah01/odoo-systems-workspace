@@ -25,7 +25,7 @@ Features:
 * Role-based access control (User / Reviewer / Manager / Admin)
 * Expiration tracking with automated reminders
 * Chatter integration for audit trail
-* Demo data for quick evaluation
+* Pre-loaded sample data for evaluation
     """,
     'author': 'Misbah Ullah',
     'website': 'https://github.com/misbah-ullah01/odoo-systems-workspace',
@@ -42,14 +42,13 @@ Features:
         # Data
         'data/sequence.xml',
         'data/cron.xml',
+        'demo/demo.xml',
         # Views
         'views/exception_control_views.xml',
         'views/security_exception_views.xml',
         'views/menus.xml',
     ],
-    'demo': [
-        'demo/demo.xml',
-    ],
+    'demo': [],
     'installable': True,
     'application': True,
     'auto_install': False,
