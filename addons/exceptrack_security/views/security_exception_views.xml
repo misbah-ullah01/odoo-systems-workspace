@@ -149,16 +149,7 @@
 
                         <!-- Compensating Controls Tab -->
                         <page string="Compensating Controls" name="controls">
-                            <field name="control_ids">
-                                <tree editable="bottom">
-                                    <field name="sequence" widget="handle"/>
-                                    <field name="name"/>
-                                    <field name="control_type"/>
-                                    <field name="status"/>
-                                    <field name="responsible_id"/>
-                                    <field name="implementation_date"/>
-                                </tree>
-                            </field>
+                            <field name="control_ids"/>
                         </page>
 
                         <!-- Verification Tab -->

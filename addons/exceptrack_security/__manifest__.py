@@ -43,8 +43,8 @@ Features:
         'data/sequence.xml',
         'data/cron.xml',
         # Views
-        'views/security_exception_views.xml',
         'views/exception_control_views.xml',
+        'views/security_exception_views.xml',
         'views/menus.xml',
     ],
     'demo': [
